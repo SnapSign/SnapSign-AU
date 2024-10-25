@@ -103,17 +103,17 @@ p {
 
 .button {
   display: inline-block;
-  padding: 20px 40px; /* Bigger padding for a larger button */
-  font-size: 20px; /* Increase the font size for prominent text */
-  font-weight: bold; /* Make the text bold */
+  padding: 10px 40px; 
+  font-size: 20px; 
+  font-weight: bold; 
   color: #fff;
-  background: linear-gradient(to bottom, #6b21a8, #1e3a8a); /* Gradient from purple to blue */
+  background: linear-gradient(to bottom, #000000, #1e3a8a); /* Gradient from purple to blue */
   text-align: center;
   text-decoration: none;
-  border-radius: 8px; /* Rounded corners */
+  border-radius: 4px; /* Rounded corners */
   transition: background-color 0.3s ease, transform 0.3s ease;
 }
 
 .button:hover {
-  background-color: #0056b3; /* Darker blue on hover */
+  background-color: #6b21a8; /* Darker burple on hover */
 }

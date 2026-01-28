@@ -1,0 +1,29 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "usage_docs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "uid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "lastUsedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "usage_docs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "lastUsedAt",
+          "order": "ASCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

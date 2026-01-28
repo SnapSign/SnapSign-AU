@@ -62,6 +62,21 @@ node_modules/
 # Yarn Integrity file
 .yarn-integrity
 
+# Build output
+dist/
+build/
+
 # dotenv environment variables file
 .env
+.env.*
+!.env.example
+
+# Firebase service account keys
+*-firebase-adminsdk-*.json
+
+# IDE/editor
+.vscode/
+.idea/
+
+# OS files
 .DS_Store

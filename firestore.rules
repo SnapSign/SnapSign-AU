@@ -1,0 +1,17 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow users to read only their own usage docs
+    match /usage_docs/{docId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.uid;
+      // Deny all client writes - only functions can write
+      allow create, update, delete: if false;
+    }
+    
+    // Allow users to create their own usage events (functions will handle creation)
+    match /usage_events/{docId} {
+      // Deny client writes - only functions can write
+      allow create, read, update, delete: if false;
+    }
+  }
+}

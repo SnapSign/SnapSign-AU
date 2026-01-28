@@ -1,4 +1,7 @@
 {
+  "functions": {
+    "source": "functions"
+  },
   "hosting": [
     {
       "target": "snapsign-au",
@@ -17,7 +20,7 @@
     },
     {
       "target": "decodocs",
-      "public": "decodocs-repo/web/build",
+      "public": "decodocs-repo/web/dist",
       "ignore": [
         "firebase.json",
         "**/.*",
@@ -30,5 +33,9 @@
         }
       ]
     }
-  ]
+  ],
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
 }

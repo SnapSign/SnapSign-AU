@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "snapsign-au"
-  }
+  },
+  "targets": {
+    "snapsign-au": {
+      "hosting": {
+        "decodocs": [
+          "decodocs-site"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

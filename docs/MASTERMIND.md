@@ -127,3 +127,8 @@ The following domains have associated repositories in the developer's portfolio:
 
 ## Future Tasks
 - **MoltHub Integration**: Add DecoDocs skill to MoltHub, the skill dock for sharp agents.
+- **DecoDocs.com Domain Setup**: Properly configure decodocs.com as a custom domain for Firebase Hosting:
+  1. Add decodocs.com as a custom domain in Firebase Console
+  2. Update DNS settings to point decodocs.com to Firebase hosting
+  3. Verify the domain configuration works properly
+  4. Optionally set up redirect from decodocs-site.web.app to decodocs.com once properly configured

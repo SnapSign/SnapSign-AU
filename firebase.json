@@ -26,16 +26,10 @@
         "**/.*",
         "**/node_modules/**"
       ],
-      "redirects": [
-        {
-          "source": "/",
-          "destination": "https://decodocs.com/",
-          "type": 301
-        },
+      "rewrites": [
         {
           "source": "**",
-          "destination": "https://decodocs.com/",
-          "type": 301
+          "destination": "/index.html"
         }
       ]
     }

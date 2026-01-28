@@ -1,7 +1,7 @@
-# Decodocs/SnapSign - Document Analysis Platform
+# DecoDocs/SnapSign - Document Analysis Platform
 
 ## Overview
-Decodocs is a document analysis platform that uses AI to help users understand complex legal documents, contracts, and terms. The platform provides plain-English explanations of legal jargon, highlights potential risks, and identifies important clauses. Decodocs shares the same Firebase project (`snapsign-au`) as SnapSign, enabling unified authentication, data, and analytics.
+DecoDocs is a document analysis platform that uses AI to help users understand complex legal documents, contracts, and terms. The platform provides plain-English explanations of legal jargon, highlights potential risks, and identifies important clauses. DecoDocs shares the same Firebase project (`snapsign-au`) as SnapSign, enabling unified authentication, data, and analytics.
 
 ## Architecture
 - **Frontend**: React/Vite application with PDF.js for client-side text extraction
@@ -44,16 +44,16 @@ Create a `.env` file in the `decodocs-repo/web` directory with your Firebase con
 2. Select your `snapsign-au` project
 3. Navigate to Project Settings (gear icon)
 4. Scroll down to the "Your apps" section
-5. Click the "</>" icon to add a web app (register the Decodocs web app)
+5. Click the "</>" icon to add a web app (register the DecoDocs web app)
 6. Copy the configuration values and add them to your `.env` file:
 
 ```env
-VITE_FIREBASE_API_KEY=your_actual_api_key_from_firebase_console
-VITE_FIREBASE_AUTH_DOMAIN=snapsign-au.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=snapsign-au
-VITE_FIREBASE_STORAGE_BUCKET=snapsign-au.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_actual_sender_id_from_firebase_console
-VITE_FIREBASE_APP_ID=your_actual_app_id_from_firebase_console
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+VITE_FIREBASE_APP_ID=
 ```
 
 ### Running Locally

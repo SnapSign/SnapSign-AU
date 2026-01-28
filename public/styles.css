@@ -79,6 +79,60 @@ p {
   margin: 0;
 }
 
+.decodocs-intro {
+  border-radius: 16px;
+  border: 1.5px solid #f2f2f2;
+  padding: 24px 16px;
+  margin: 32px 0;
+  text-align: center;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.decodocs-intro h2 {
+  margin-top: 0;
+}
+
+.decodocs-link {
+  margin-top: 8px;
+}
+
+.decodocs-link a {
+  color: #1e3a8a;
+  font-weight: 700;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(30, 58, 138, 0.25);
+}
+
+.decodocs-link a:hover {
+  border-bottom-color: rgba(30, 58, 138, 0.7);
+}
+
+.feature-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  max-width: 320px;
+}
+
+.feature-list li {
+  position: relative;
+  text-align: left;
+  font-size: 14px;
+  line-height: 22px;
+  margin: 10px 0 0 0;
+  padding-left: 18px;
+}
+
+.feature-list li::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: #1e3a8a;
+  font-weight: 700;
+}
+
 .cta {
   border-radius: 16px;
   border: 1.5px solid #f2f2f2;
@@ -94,6 +148,10 @@ p {
 
   .product {
     padding: 32px;
+  }
+
+  .feature-list {
+    max-width: 100%;
   }
 
   .container {

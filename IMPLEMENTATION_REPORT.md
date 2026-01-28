@@ -1,6 +1,6 @@
 # 🎯 All Issues Fixed - Comprehensive Summary
 
-**Project**: SnapSign-AU / DecoDoccs  
+**Project**: SnapSign-AU / DecoDocs  
 **Date**: January 28, 2026  
 **Status**: ✅ **ALL 4 ISSUES RESOLVED**
 
@@ -85,12 +85,12 @@ Sensitive information (API keys, private keys, service account JSON) was exposed
 
 2. **Created `.env.example` template**
    ```env
-   VITE_FIREBASE_API_KEY=your_api_key_here
+   VITE_FIREBASE_API_KEY=
    VITE_FIREBASE_AUTH_DOMAIN=snapsign-au.firebaseapp.com
    VITE_FIREBASE_PROJECT_ID=snapsign-au
    VITE_FIREBASE_STORAGE_BUCKET=snapsign-au.appspot.com
-   VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id_here
-   VITE_FIREBASE_APP_ID=your_app_id_here
+   VITE_FIREBASE_MESSAGING_SENDER_ID=
+   VITE_FIREBASE_APP_ID=
    ```
 
 3. **Updated SETUP_INSTRUCTIONS.md**

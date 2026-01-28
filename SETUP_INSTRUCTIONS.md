@@ -1,8 +1,8 @@
-# Decodocs/SnapSign Setup Instructions
+# DecoDocs/SnapSign Setup Instructions
 
 ## Environment Configuration for Production
 
-To properly configure the Decodocs application in your Firebase project, you need to set up environment variables for the deployed site.
+To properly configure the DecoDocs application in your Firebase project, you need to set up environment variables for the deployed site.
 
 ### Option 1: Using Firebase Extensions (Recommended)
 If you have access to Firebase Extensions, you can set environment variables using the Firebase CLI:
@@ -23,12 +23,12 @@ Since this is a static React/Vite app, environment variables need to be availabl
 
 1. Create a `.env.production` file in the `decodocs-repo/web` directory:
 ```env
-VITE_FIREBASE_API_KEY=your_actual_api_key
-VITE_FIREBASE_AUTH_DOMAIN=snapsign-au.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=snapsign-au
-VITE_FIREBASE_STORAGE_BUCKET=snapsign-au.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_actual_sender_id
-VITE_FIREBASE_APP_ID=your_actual_app_id
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+VITE_FIREBASE_APP_ID=
 ```
 
 2. Rebuild and redeploy the application:

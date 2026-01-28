@@ -1,0 +1,11 @@
+# Never upload local env/config files or service account keys.
+**/.env
+**/.env.*
+!**/.env.example
+
+**/*-firebase-adminsdk-*.json
+
+# OS/IDE noise
+**/.DS_Store
+**/.idea/**
+**/.vscode/**

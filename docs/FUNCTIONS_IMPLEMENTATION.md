@@ -1,7 +1,7 @@
-# Decodocs AI Functions - Implementation Documentation
+# DecoDocs AI Functions - Implementation Documentation
 
 ## Overview
-This document describes the implementation of backend AI functions for the Decodocs/SnapSign application. Both applications share the same Firebase project (`snapsign-au`), enabling unified authentication, data, and analytics. The system implements anonymous identity, document fingerprinting, preflight classification, text-first analysis, AI call accounting, and usage metrics storage.
+This document describes the implementation of backend AI functions for the DecoDocs/SnapSign application. Both applications share the same Firebase project (`snapsign-au`), enabling unified authentication, data, and analytics. The system implements anonymous identity, document fingerprinting, preflight classification, text-first analysis, AI call accounting, and usage metrics storage.
 
 ## Architecture
 

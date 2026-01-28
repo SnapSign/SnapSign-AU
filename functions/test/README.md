@@ -1,4 +1,4 @@
-# Decodocs Functions Tests
+# DecoDocs Functions Tests
 
 This directory contains unit and integration tests for the Firebase Functions.
 

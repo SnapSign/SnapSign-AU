@@ -7,7 +7,7 @@ let testEnv;
 let db;
 let functions;
 
-describe('Decodocs Functions Tests', () => {
+describe('DecoDocs Functions Tests', () => {
   before(async () => {
     testEnv = await initializeTestEnvironment({
       projectId: 'snapsign-au-test',

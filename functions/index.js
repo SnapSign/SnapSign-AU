@@ -1,7 +1,37 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const fs = require('fs');
+const path = require('path');
 
-admin.initializeApp();
+// In production on Firebase, Admin SDK uses application default credentials automatically.
+// For local development (emulators), we optionally bootstrap with a service account JSON file.
+const initAdmin = () => {
+  const isEmulator =
+    !!process.env.FUNCTIONS_EMULATOR ||
+    !!process.env.FIREBASE_EMULATOR_HUB ||
+    !!process.env.FIRESTORE_EMULATOR_HOST;
+
+  // Prefer GOOGLE_APPLICATION_CREDENTIALS if the developer set it.
+  const envPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+
+  // Convenience: if running locally and the repo has a downloaded service account in /functions,
+  // use it without requiring extra env wiring.
+  const bundledPath = path.join(__dirname, 'snapsign-au-firebase-adminsdk-zfdkg-b70731eac2.json');
+
+  const credentialsPath =
+    (envPath && envPath.trim()) ? envPath.trim() : (isEmulator && fs.existsSync(bundledPath) ? bundledPath : null);
+
+  if (credentialsPath && fs.existsSync(credentialsPath)) {
+    const raw = fs.readFileSync(credentialsPath, 'utf8');
+    const serviceAccount = JSON.parse(raw);
+    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+    return;
+  }
+
+  admin.initializeApp();
+};
+
+initAdmin();
 
 const db = admin.firestore();
 

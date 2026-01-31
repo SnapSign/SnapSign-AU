@@ -80,3 +80,6 @@ build/
 
 # OS files
 .DS_Store
+
+# Nested DecoDocs repo (intentionally separate git repo)
+decodocs/

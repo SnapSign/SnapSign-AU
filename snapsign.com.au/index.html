@@ -32,6 +32,17 @@
   <!-- Canonical Link -->
   <link rel="canonical" href="https://snapsign.com.au/" />
 
+  <script>
+    (function () {
+      var canonicalHost = 'snapsign.com.au';
+      var host = location.host;
+      var isFirebase = host.endsWith('.web.app') || host.endsWith('.firebaseapp.com');
+      if (isFirebase && host !== canonicalHost) {
+        location.replace('https://' + canonicalHost + location.pathname + location.search + location.hash);
+      }
+    })();
+  </script>
+
   <!-- Twitter Card Meta Tags -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Snap Sign Pty Ltd | Digital Signature Solutions" />

@@ -8,6 +8,14 @@
 
 **Rule:** Do not vendor/copy DecoDocs into SnapSign-AU history. Keep it as its own repo.
 
+## Hosting targets → production domains
+Firebase Hosting targets in `firebase.json` map to production domains as follows:
+
+1) `site: "snapsign-au"` → **snapsign.com.au**
+   - static/SPA hosting served from `public/`
+
+2) `site: "decodocs-site"` → **decodocs.com**
+   - DecoDocs app hosting served from `decodocs/web/dist`
 
 ## Hosting/Functions Requirements
 - **Use only simple (static or SPA) Firebase Hosting and basic gen2 Functions for all subprojects.**

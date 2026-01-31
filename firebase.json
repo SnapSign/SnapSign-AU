@@ -20,7 +20,7 @@
     },
     {
       "site": "decodocs-site",
-      "public": "decodocs.com",
+      "public": "decodocs/web/decodocs.com",
       "ignore": [
         "firebase.json",
         "**/.*",

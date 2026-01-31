@@ -1,0 +1,10 @@
+User-agent: *
+Disallow: /view
+Disallow: /view/
+Disallow: /edit
+Disallow: /edit/
+Disallow: /app
+Disallow: /app/
+
+# If/when a sitemap is added, uncomment and set the correct URL.
+# Sitemap: https://decodocs.com/sitemap.xml

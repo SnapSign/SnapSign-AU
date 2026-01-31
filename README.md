@@ -29,16 +29,16 @@ DecoDocs is a document analysis platform that uses AI to help users understand c
 ### Installation
 ```bash
 # Install dependencies
-cd decodocs-repo/web
+cd decodocs/web
 npm install
 
 # Install functions dependencies
-cd ../functions
+cd ../../functions
 npm install
 ```
 
 ### Environment Configuration
-Create a `.env` file in the `decodocs-repo/web` directory with your Firebase configuration. To get the actual values for your `snapsign-au` Firebase project:
+Create a `.env` file in the `decodocs/web` directory with your Firebase configuration. To get the actual values for your `snapsign-au` Firebase project:
 
 1. Go to the [Firebase Console](https://console.firebase.google.com/)
 2. Select your `snapsign-au` project
@@ -62,7 +62,7 @@ VITE_FIREBASE_APP_ID=
 firebase emulators:start
 
 # In another terminal, start the development server
-cd decodocs-repo/web
+cd decodocs/web
 npm run dev
 ```
 

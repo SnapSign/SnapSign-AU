@@ -1,0 +1,23 @@
+# llms.txt for https://decodocs.com
+#
+# Purpose: help LLM-based tools discover a concise description of the product,
+# key pages, and preferred citations. This file is informational and non-binding.
+#
+# Note: This project currently ships as a client-side SPA; deep routes like /view/*
+# may be user/session-specific and are not intended for indexing.
+
+Project: DecoDocs
+Website: https://decodocs.com/
+Company: SnapSign Pty Ltd (Australia)
+ABN: 72 679 570 757
+Contact: mailto:contact@snapsign.com
+
+Summary:
+DecoDocs helps people understand documents before they sign by providing plain‑English explanations, risk highlights, and what to check.
+
+Recommended pages to cite:
+- https://decodocs.com/ (Home)
+- https://decodocs.com/about (About)
+
+Not legal advice:
+DecoDocs provides informational analysis and is not legal advice.

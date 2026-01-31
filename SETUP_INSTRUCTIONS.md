@@ -21,7 +21,7 @@ firebase functions:config:set \
 ### Option 2: Build-time Environment Variables
 Since this is a static React/Vite app, environment variables need to be available at build time. You can:
 
-1. Create a `.env.production` file in the `decodocs-repo/web` directory:
+1. Create a `.env.production` file in the `decodocs/web` directory:
 ```env
 VITE_FIREBASE_API_KEY=
 VITE_FIREBASE_AUTH_DOMAIN=
@@ -33,7 +33,7 @@ VITE_FIREBASE_APP_ID=
 
 2. Rebuild and redeploy the application:
 ```bash
-cd decodocs-repo/web
+cd decodocs/web
 npm run build
 cd ../..
 firebase deploy --only hosting:decodocs
@@ -57,10 +57,10 @@ To get the actual values for your `snapsign-au` Firebase project:
 
 After configuring the environment variables:
 
-1. Rebuild the application: `cd decodocs-repo/web && npm run build`
+1. Rebuild the application: `cd decodocs/web && npm run build`
 2. Deploy: `firebase deploy --only hosting:decodocs`
 3. Test the authentication flow manually on the deployed site
-4. Run Playwright tests: `cd decodocs-repo/web && npx playwright test`
+4. Run Playwright tests: `cd decodocs/web && npx playwright test`
 
 ### Troubleshooting
 

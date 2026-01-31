@@ -1,4 +1,13 @@
-# AGENTS.md - Deployment and Hosting Policy for SnapSign-AU (and DecoDocs)
+# AGENTS.md - SnapSign-AU Deployment Repo + Nested DecoDocs Policy
+
+## Repo structure (important)
+- This repository is the **Firebase deployment/hosting umbrella** for the `snapsign-au` Firebase project (hosting + functions + rules).
+- `decodocs/` is a **nested, independent git repository** (it contains its own `.git/`).
+- DecoDocs must remain physically nested under this repo so Firebase Hosting can deploy from:
+  - `decodocs/web/dist`
+
+**Rule:** Do not vendor/copy DecoDocs into SnapSign-AU history. Keep it as its own repo.
+
 
 ## Hosting/Functions Requirements
 - **Use only simple (static or SPA) Firebase Hosting and basic gen2 Functions for all subprojects.**

@@ -1,0 +1,8 @@
+# llms.txt for SnapSign
+Website: https://snapsign.com.au/
+Company: SnapSign Pty Ltd (Australia)
+ABN: 72 679 570 757
+Contact: mailto:contact@snapsign.com
+
+Summary:
+SnapSign builds products for working with documents, including DecoDocs for document understanding.

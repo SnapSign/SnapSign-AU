@@ -83,3 +83,6 @@ build/
 
 # Nested DecoDocs repo (intentionally separate git repo)
 decodocs/
+
+# Build output for decodocs-site hosting
+decodocs.com/

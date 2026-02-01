@@ -950,6 +950,30 @@ exports.analyzeByType = functions.https.onCall(async (data, context) => {
 
   const text = String(data?.text || '').slice(0, 250000);
 
+  const estimatedTokens = estimateTokensFromChars(text.length);
+
+  // Enforce token budgets (per uid/puid) same as analyzeText.
+  const budget = await enforceAndRecordTokenUsage({
+    puid,
+    tier,
+    estimatedTokens,
+  });
+
+  if (!budget.allowed) {
+    return {
+      ok: false,
+      code: budget.code,
+      message: tier === 'anonymous'
+        ? 'Anonymous token limit reached. Create a free account to continue.'
+        : 'Daily token limit reached. Upgrade to Pro to continue.',
+      requiredTier: tier === 'anonymous' ? 'free' : 'pro',
+      usage: {
+        estimatedTokens,
+        remainingTokens: budget.remaining,
+      },
+    };
+  }
+
   // Resolve effective type server-side.
   const overrideRef = db.collection('doc_type_overrides').doc(`${puid}_${docHash}`);
   const detectedRef = db.collection('doc_classifications').doc(docHash);
@@ -1024,6 +1048,21 @@ exports.analyzeByType = functions.https.onCall(async (data, context) => {
     result.checks.push({ id: 'mentions_pii', ok: pii, message: 'Mentions personal information / data collection' });
   }
 
+  // Usage event (optional logging)
+  await db.collection('usage_events').add({
+    puid,
+    uid,
+    tier,
+    docHash,
+    event: 'analyzeByType',
+    at: admin.firestore.FieldValue.serverTimestamp(),
+    meta: {
+      estimatedTokens,
+      effectiveTypeId,
+      validationSlug,
+    },
+  });
+
   return {
     ok: true,
     uid,
@@ -1038,6 +1077,10 @@ exports.analyzeByType = functions.https.onCall(async (data, context) => {
     result,
     stats: {
       textChars: text.length,
+    },
+    usage: {
+      estimatedTokens,
+      remainingTokens: budget.remaining,
     },
     message: 'Heuristic type-specific analysis (placeholder). Next step: run LLM extraction/validation server-side using validationSpec.',
   };

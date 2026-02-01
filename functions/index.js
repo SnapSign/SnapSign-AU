@@ -978,7 +978,52 @@ exports.analyzeByType = functions.https.onCall(async (data, context) => {
     }
   }
 
-  // Placeholder output until LLM is wired.
+  const safeText = text;
+  const lower = safeText.toLowerCase();
+
+  const result = {
+    plainExplanation: validationSpec
+      ? `Type-specific analysis for ${effectiveTypeId} using validation spec “${validationSpec?.title || validationSlug}”.`
+      : `Type-specific analysis for ${effectiveTypeId || 'unknown type'}.`,
+    extracted: {},
+    checks: [],
+  };
+
+  // Very lightweight heuristic extraction (placeholder until LLM is wired).
+  if (effectiveTypeId === 'business_invoice') {
+    const abn = safeText.match(/\b\d{2}\s?\d{3}\s?\d{3}\s?\d{3}\b/);
+    const gst = /\bgst\b/.test(lower);
+    const invNo = safeText.match(/\binvoice\s*(number|no\.?|#)\s*[:\-]?\s*([A-Z0-9\-]{3,})/i);
+    result.extracted = {
+      invoiceNumber: invNo?.[2] || null,
+      abn: abn?.[0] || null,
+      mentionsGST: gst,
+    };
+    result.checks.push({ id: 'has_abn', ok: !!result.extracted.abn, message: 'ABN detected' });
+  }
+
+  if (effectiveTypeId === 'legal_job_offer') {
+    const salary = safeText.match(/\b\$\s?\d{2,3}(?:,\d{3})*(?:\.\d{2})?\b/);
+    const start = safeText.match(/\b(commencement|start)\s+date\b/i);
+    result.extracted = {
+      salaryMention: salary?.[0] || null,
+      hasStartDateSection: !!start,
+    };
+    result.checks.push({ id: 'salary_mentioned', ok: !!result.extracted.salaryMention, message: 'Salary mentioned' });
+  }
+
+  if (effectiveTypeId === 'general_sop_procedure') {
+    const stepCount = (safeText.match(/\bstep\s+\d+\b/gi) || []).length;
+    result.extracted = { stepCount };
+    result.checks.push({ id: 'has_steps', ok: stepCount > 0, message: 'Contains numbered steps' });
+  }
+
+  if (effectiveTypeId === 'policy_privacy') {
+    const pii = /(personal information|personal data|privacy|data collection|third parties)/i.test(safeText);
+    result.extracted = { mentionsPersonalInfo: pii };
+    result.checks.push({ id: 'mentions_pii', ok: pii, message: 'Mentions personal information / data collection' });
+  }
+
   return {
     ok: true,
     uid,
@@ -990,10 +1035,11 @@ exports.analyzeByType = functions.https.onCall(async (data, context) => {
     effectiveTypeId,
     validationSlug,
     validationSpec,
-    message: 'analyzeByType is currently a stub. Next step: run LLM extraction/validation server-side using validationSpec.',
+    result,
     stats: {
       textChars: text.length,
     },
+    message: 'Heuristic type-specific analysis (placeholder). Next step: run LLM extraction/validation server-side using validationSpec.',
   };
 });
 

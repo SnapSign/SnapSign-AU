@@ -823,6 +823,10 @@ const VALIDATION_SPEC_BASE_URL =
   process.env.DECODOCS_VALIDATION_SPEC_BASE_URL ||
   'https://raw.githubusercontent.com/MaxSmile/decadocs/main/web/public/classifications/validation';
 
+const DOCUMENT_TYPES_INDEX_URL =
+  process.env.DECODOCS_DOCUMENT_TYPES_INDEX_URL ||
+  'https://raw.githubusercontent.com/MaxSmile/decadocs/main/web/public/classifications/document-types.index.json';
+
 const _validationSpecCache = new Map();
 const getValidationSpec = async (validationSlug) => {
   if (!validationSlug) return null;
@@ -838,6 +842,24 @@ const getValidationSpec = async (validationSlug) => {
 
   _validationSpecCache.set(validationSlug, { value: json, expiresAtMs: now + 5 * 60 * 1000 });
   return json;
+};
+
+let _documentTypesIndexCache = { value: null, expiresAtMs: 0 };
+const getDocumentTypesIndex = async () => {
+  const now = Date.now();
+  if (_documentTypesIndexCache.value && _documentTypesIndexCache.expiresAtMs > now) {
+    return _documentTypesIndexCache.value;
+  }
+
+  const resp = await fetch(DOCUMENT_TYPES_INDEX_URL);
+  if (!resp.ok) throw new Error(`Failed to fetch document types index: ${resp.status}`);
+  const json = await resp.json();
+
+  const types = Array.isArray(json?.types) ? json.types : null;
+  if (!types) throw new Error('Invalid document-types.index.json (missing types)');
+
+  _documentTypesIndexCache = { value: { ...json, types }, expiresAtMs: now + 5 * 60 * 1000 };
+  return _documentTypesIndexCache.value;
 };
 
 exports.detectDocumentType = functions.https.onCall(async (data, context) => {
@@ -937,15 +959,15 @@ exports.analyzeByType = functions.https.onCall(async (data, context) => {
   const detectedTypeId = detectedSnap.exists ? (detectedSnap.data()?.typeId || null) : null;
   const effectiveTypeId = overrideTypeId || detectedTypeId || null;
 
-  // Map a subset of types to validation specs (expand as we add more).
-  const typeToSlug = {
-    business_invoice: 'invoice',
-    legal_job_offer: 'job-offer',
-    general_sop_procedure: 'sop-procedure',
-    policy_privacy: 'company-policy',
-  };
-
-  const validationSlug = effectiveTypeId ? (typeToSlug[effectiveTypeId] || null) : null;
+  // Prefer the generated document-types index (has validationSlug).
+  let validationSlug = null;
+  try {
+    const idx = await getDocumentTypesIndex();
+    const t = idx.types.find((x) => x.id === effectiveTypeId);
+    validationSlug = t?.validationSlug || null;
+  } catch (e) {
+    console.warn('analyzeByType: could not load document types index', e);
+  }
 
   let validationSpec = null;
   if (validationSlug) {

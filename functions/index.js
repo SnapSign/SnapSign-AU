@@ -599,6 +599,122 @@ exports.stripeCreatePortalSession = functions.https.onCall(async (data, context)
   return { url: session.url };
 });
 
+const upsertStripeSubscriptionState = async ({ puid, stripeStatus, customerId, subscriptionId, eventType }) => {
+  const isPro = isStripeProStatus(stripeStatus);
+
+  await db.collection('users').doc(puid).set(
+    {
+      subscription: {
+        provider: 'stripe',
+        customerId: customerId || null,
+        subscriptionId: subscriptionId || null,
+        status: stripeStatus || null,
+        isPro,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      // Helpful for debugging/migrations
+      lastStripeEvent: {
+        type: eventType || null,
+        receivedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+    },
+    { merge: true }
+  );
+
+  return { puid, isPro };
+};
+
+// POST /stripeWebhook
+// Real Stripe webhook endpoint.
+// - Validates signature using admin/stripe.webhookSecret (whsec_...)
+// - Updates users/{puid}.subscription and isPro
+exports.stripeWebhook = functions.https.onRequest(async (req, res) => {
+  try {
+    if (req.method !== 'POST') {
+      res.status(405).send('Method not allowed');
+      return;
+    }
+
+    const adminCfg = await getStripeAdminConfig();
+    const webhookSecret = String(adminCfg?.webhookSecret || '');
+    if (!webhookSecret.startsWith('whsec_')) {
+      res.status(500).send('Stripe webhookSecret missing (admin/stripe.webhookSecret)');
+      return;
+    }
+
+    const stripe = getStripeClient(adminCfg);
+
+    const sig = req.get('stripe-signature');
+    if (!sig) {
+      res.status(400).send('Missing stripe-signature header');
+      return;
+    }
+
+    // Firebase provides rawBody for signature verification.
+    const event = stripe.webhooks.constructEvent(req.rawBody, sig, webhookSecret);
+
+    const type = event.type;
+    const obj = event.data?.object || {};
+
+    // 1) Subscription events: rely on subscription.metadata.{puid|firebaseUid}
+    if (type === 'customer.subscription.created' || type === 'customer.subscription.updated' || type === 'customer.subscription.deleted') {
+      const stripeStatus = obj.status;
+      const customerId = obj.customer;
+      const subscriptionId = obj.id;
+      const puidMeta = obj.metadata?.puid;
+      const firebaseUid = obj.metadata?.firebaseUid;
+
+      const puid = puidMeta || (firebaseUid ? await resolvePuidForUid(firebaseUid) : null);
+      if (!puid) {
+        res.status(400).send('Missing subscription metadata puid/firebaseUid');
+        return;
+      }
+
+      const result = await upsertStripeSubscriptionState({ puid, stripeStatus, customerId, subscriptionId, eventType: type });
+      res.status(200).json({ ok: true, ...result });
+      return;
+    }
+
+    // 2) Checkout session completed: helpful for capturing customerId/subscriptionId early
+    if (type === 'checkout.session.completed') {
+      const customerId = obj.customer;
+      const subscriptionId = obj.subscription;
+      const puid = obj.client_reference_id || obj.metadata?.puid || (obj.metadata?.firebaseUid ? await resolvePuidForUid(obj.metadata.firebaseUid) : null);
+
+      if (!puid) {
+        res.status(200).json({ ok: true, ignored: true });
+        return;
+      }
+
+      await db.collection('users').doc(puid).set(
+        {
+          subscription: {
+            provider: 'stripe',
+            customerId: customerId || null,
+            subscriptionId: subscriptionId || null,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          lastStripeEvent: {
+            type,
+            receivedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+        },
+        { merge: true }
+      );
+
+      res.status(200).json({ ok: true, puid });
+      return;
+    }
+
+    // Unhandled events: acknowledge to Stripe.
+    res.status(200).json({ ok: true, ignored: true, type });
+  } catch (e) {
+    console.error('stripeWebhook error:', e);
+    // Stripe expects non-2xx to retry. We should be strict.
+    res.status(400).send(`Webhook Error: ${e.message}`);
+  }
+});
+
 // POST /stripeWebhookMock
 // - For local development: lets us simulate Stripe webhooks.
 // - In non-emulator: requires x-mock-secret header matching admin/stripe.mockWebhookSecret.
@@ -635,28 +751,9 @@ exports.stripeWebhookMock = functions.https.onRequest(async (req, res) => {
     }
 
     const puid = await resolvePuidForUid(firebaseUid);
-    const isPro = isStripeProStatus(stripeStatus);
+    const result = await upsertStripeSubscriptionState({ puid, stripeStatus, customerId, subscriptionId, eventType: event?.type });
 
-    await db.collection('users').doc(puid).set(
-      {
-        subscription: {
-          provider: 'stripe',
-          customerId: customerId || null,
-          subscriptionId: subscriptionId || null,
-          status: stripeStatus || null,
-          isPro,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        },
-        // Helpful for debugging/migrations
-        lastStripeEvent: {
-          type: event?.type || null,
-          receivedAt: admin.firestore.FieldValue.serverTimestamp(),
-        },
-      },
-      { merge: true }
-    );
-
-    res.status(200).json({ ok: true, puid, isPro });
+    res.status(200).json({ ok: true, ...result });
   } catch (e) {
     console.error('stripeWebhookMock error:', e);
     res.status(500).json({ ok: false, error: e?.message || 'internal' });

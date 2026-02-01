@@ -819,6 +819,27 @@ exports.getDocumentTypeState = functions.https.onCall(async (data, context) => {
 });
 
 // Cheap (non-AI) document type detection to seed routing; can be replaced by LLM later.
+const VALIDATION_SPEC_BASE_URL =
+  process.env.DECODOCS_VALIDATION_SPEC_BASE_URL ||
+  'https://raw.githubusercontent.com/MaxSmile/decadocs/main/web/public/classifications/validation';
+
+const _validationSpecCache = new Map();
+const getValidationSpec = async (validationSlug) => {
+  if (!validationSlug) return null;
+
+  const now = Date.now();
+  const cached = _validationSpecCache.get(validationSlug);
+  if (cached && cached.expiresAtMs > now) return cached.value;
+
+  const url = `${VALIDATION_SPEC_BASE_URL}/${encodeURIComponent(validationSlug)}.json`;
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`Failed to fetch validation spec (${validationSlug}): ${resp.status}`);
+  const json = await resp.json();
+
+  _validationSpecCache.set(validationSlug, { value: json, expiresAtMs: now + 5 * 60 * 1000 });
+  return json;
+};
+
 exports.detectDocumentType = functions.https.onCall(async (data, context) => {
   const { uid, puid, tier } = await getUserEntitlement(context);
 
@@ -895,6 +916,63 @@ exports.detectDocumentType = functions.https.onCall(async (data, context) => {
   );
 
   return { ok: true, uid, puid, docHash, intakeCategory, typeId, confidence, reasons };
+});
+
+// Type-specific analysis entrypoint.
+// NOTE: currently returns validation spec + metadata (AI execution will be wired in next).
+exports.analyzeByType = functions.https.onCall(async (data, context) => {
+  const { uid, puid, tier } = await getUserEntitlement(context);
+
+  const docHash = data?.docHash;
+  validateDocHash(docHash);
+
+  const text = String(data?.text || '').slice(0, 250000);
+
+  // Resolve effective type server-side.
+  const overrideRef = db.collection('doc_type_overrides').doc(`${puid}_${docHash}`);
+  const detectedRef = db.collection('doc_classifications').doc(docHash);
+  const [overrideSnap, detectedSnap] = await Promise.all([overrideRef.get(), detectedRef.get()]);
+
+  const overrideTypeId = overrideSnap.exists ? (overrideSnap.data()?.typeId || null) : null;
+  const detectedTypeId = detectedSnap.exists ? (detectedSnap.data()?.typeId || null) : null;
+  const effectiveTypeId = overrideTypeId || detectedTypeId || null;
+
+  // Map a subset of types to validation specs (expand as we add more).
+  const typeToSlug = {
+    business_invoice: 'invoice',
+    legal_job_offer: 'job-offer',
+    general_sop_procedure: 'sop-procedure',
+    policy_privacy: 'company-policy',
+  };
+
+  const validationSlug = effectiveTypeId ? (typeToSlug[effectiveTypeId] || null) : null;
+
+  let validationSpec = null;
+  if (validationSlug) {
+    try {
+      validationSpec = await getValidationSpec(validationSlug);
+    } catch (e) {
+      console.warn('analyzeByType: could not load validation spec', e);
+    }
+  }
+
+  // Placeholder output until LLM is wired.
+  return {
+    ok: true,
+    uid,
+    puid,
+    tier,
+    docHash,
+    overrideTypeId,
+    detectedTypeId,
+    effectiveTypeId,
+    validationSlug,
+    validationSpec,
+    message: 'analyzeByType is currently a stub. Next step: run LLM extraction/validation server-side using validationSpec.',
+    stats: {
+      textChars: text.length,
+    },
+  };
 });
 
 exports.cleanupOldUsageRecords = functions.pubsub.schedule('every 24 hours from 01:00 to 02:00')

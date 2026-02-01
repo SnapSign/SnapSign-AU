@@ -38,12 +38,19 @@ const db = admin.firestore();
 
 // Configuration constants
 const CONFIG = {
-  FREE_AI_CALLS_PER_DOC: 1,
-  PRO_AI_CALLS_PER_DOC: 3,
+  // Scan detection
   MIN_CHARS_PER_PAGE: 30,
   SCAN_RATIO_THRESHOLD: 0.20,
+
+  // Safety limits (hard caps; configurable later via Firestore admin_constants)
   FREE_MAX_TOTAL_CHARS: 120000,
-  TTL_DAYS_USAGE_DOCS: 30
+
+  // Token budgets (authoritative spec lives in decodocs/docs/SUBSCRIPTION_TIERS.md)
+  ANON_TOKENS_PER_UID: 20000,
+  FREE_TOKENS_PER_DAY: 40000,
+
+  // Retention for rolling usage docs (docHash ledger is forever; see decodocs/docs/SUBSCRIPTION_TIERS.md)
+  TTL_DAYS_USAGE_DOCS: 30,
 };
 
 // Function to validate auth context
@@ -57,11 +64,116 @@ const validateAuth = (context) => {
   return context.auth.uid;
 };
 
-// Helper to get user's plan (for MVP, assuming all anonymous users are free)
-const getUserPlan = (uid) => {
-  // In a real implementation, this would look up the user's subscription status
-  // For MVP, all anonymous users are considered free tier
-  return 'free';
+const getAuthFlags = (context) => {
+  const token = context?.auth?.token || {};
+  const provider = token?.firebase?.sign_in_provider;
+  return {
+    isAnonymous: provider === 'anonymous',
+    signInProvider: provider || null,
+  };
+};
+
+const resolvePuidForUid = async (uid) => {
+  // MVP: puid == uid. Later: look up uid_aliases/{uid} => puid.
+  return uid;
+};
+
+const getUserEntitlement = async (context) => {
+  const uid = validateAuth(context);
+  const { isAnonymous } = getAuthFlags(context);
+  const puid = await resolvePuidForUid(uid);
+
+  const userRef = db.collection('users').doc(puid);
+  const userSnap = await userRef.get();
+
+  const isPro = !!(userSnap.exists && userSnap.data()?.subscription?.isPro);
+
+  const tier = isPro ? 'pro' : (isAnonymous ? 'anonymous' : 'free');
+
+  // Ensure a minimal record exists for all users (including anonymous)
+  if (!userSnap.exists) {
+    await userRef.set(
+      {
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastSeenAt: admin.firestore.FieldValue.serverTimestamp(),
+        subscription: { isPro: false },
+      },
+      { merge: true }
+    );
+  } else {
+    await userRef.set({ lastSeenAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+  }
+
+  return { uid, puid, tier, isPro };
+};
+
+const estimateTokensFromChars = (totalChars) => Math.max(0, Math.floor((totalChars || 0) / 4));
+
+const getDayKey = () => {
+  const d = new Date();
+  const yyyy = String(d.getUTCFullYear());
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  return `${yyyy}${mm}${dd}`; // UTC day
+};
+
+const enforceAndRecordTokenUsage = async ({ puid, tier, estimatedTokens }) => {
+  if (tier === 'pro') {
+    return { allowed: true, remaining: null };
+  }
+
+  if (tier === 'anonymous') {
+    const userRef = db.collection('users').doc(puid);
+    const snap = await userRef.get();
+    const used = snap.exists ? (snap.data()?.usage?.anonTokensUsed || 0) : 0;
+
+    if (used + estimatedTokens > CONFIG.ANON_TOKENS_PER_UID) {
+      return { allowed: false, code: 'ANON_TOKEN_LIMIT', remaining: Math.max(0, CONFIG.ANON_TOKENS_PER_UID - used) };
+    }
+
+    await userRef.set(
+      {
+        usage: {
+          anonTokensUsed: admin.firestore.FieldValue.increment(estimatedTokens),
+        },
+      },
+      { merge: true }
+    );
+
+    return { allowed: true, remaining: Math.max(0, CONFIG.ANON_TOKENS_PER_UID - (used + estimatedTokens)) };
+  }
+
+  // tier === 'free'
+  const dayKey = getDayKey();
+  const ref = db.collection('usage_daily').doc(`${puid}_${dayKey}`);
+
+  let used = 0;
+  await db.runTransaction(async (tx) => {
+    const doc = await tx.get(ref);
+    used = doc.exists ? (doc.data()?.tokensUsed || 0) : 0;
+
+    if (used + estimatedTokens > CONFIG.FREE_TOKENS_PER_DAY) {
+      return;
+    }
+
+    tx.set(
+      ref,
+      {
+        puid,
+        dayKey,
+        tokensUsed: admin.firestore.FieldValue.increment(estimatedTokens),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: doc.exists ? doc.data()?.createdAt : admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+  });
+
+  if (used + estimatedTokens > CONFIG.FREE_TOKENS_PER_DAY) {
+    return { allowed: false, code: 'FREE_TOKEN_LIMIT', remaining: Math.max(0, CONFIG.FREE_TOKENS_PER_DAY - used) };
+  }
+
+  return { allowed: true, remaining: Math.max(0, CONFIG.FREE_TOKENS_PER_DAY - (used + estimatedTokens)) };
 };
 
 // Helper to validate document hash format
@@ -133,31 +245,30 @@ exports.preflightCheck = functions.https.onCall(async (data, context) => {
     // Compute scan ratio
     const scanRatio = computeScanRatio(charsPerPage, pageCount);
     
-    // Get user's plan
-    const plan = getUserPlan(uid);
-    
+    const entitlement = await getUserEntitlement(context);
+
     // Determine classification
-    let classification = 'FREE_OK';
-    let requiredPlan = 'free';
+    let classification = 'OK';
+    let requiredTier = entitlement.tier;
     let reasons = [];
-    
+
     // Check if document is scanned
-    if (scanRatio > CONFIG.SCAN_RATIO_THRESHOLD && plan === 'free') {
+    if (scanRatio > CONFIG.SCAN_RATIO_THRESHOLD && entitlement.tier !== 'pro') {
       classification = 'PRO_REQUIRED';
-      requiredPlan = 'pro';
+      requiredTier = 'pro';
       reasons.push({
         code: 'SCAN_DETECTED',
         message: 'Scanned PDFs require OCR (Pro).'
       });
     }
-    
-    // Check size limits for free tier
-    if (plan === 'free' && totalChars > CONFIG.FREE_MAX_TOTAL_CHARS) {
+
+    // Check size limits for non-Pro
+    if (entitlement.tier !== 'pro' && totalChars > CONFIG.FREE_MAX_TOTAL_CHARS) {
       classification = 'PRO_REQUIRED';
-      requiredPlan = 'pro';
+      requiredTier = 'pro';
       reasons.push({
         code: 'SIZE_LIMIT_EXCEEDED',
-        message: `Document too large for Free tier (${totalChars} chars, limit ${CONFIG.FREE_MAX_TOTAL_CHARS}).`
+        message: `Document too large (${totalChars} chars, limit ${CONFIG.FREE_MAX_TOTAL_CHARS}).`
       });
     }
     
@@ -167,12 +278,16 @@ exports.preflightCheck = functions.https.onCall(async (data, context) => {
     return {
       ok: true,
       classification,
-      requiredPlan,
+      requiredTier,
       reasons,
+      entitlement: {
+        tier: entitlement.tier,
+        isPro: entitlement.isPro,
+      },
       stats: {
         scanRatio,
-        estimatedTokens
-      }
+        estimatedTokens,
+      },
     };
     
   } catch (error) {
@@ -192,8 +307,8 @@ exports.preflightCheck = functions.https.onCall(async (data, context) => {
 // Analyze text function
 exports.analyzeText = functions.https.onCall(async (data, context) => {
   try {
-    const uid = validateAuth(context);
-    
+    const entitlement = await getUserEntitlement(context);
+
     const { 
       docHash, 
       stats, 
@@ -221,75 +336,52 @@ exports.analyzeText = functions.https.onCall(async (data, context) => {
       );
     }
     
-    // Create document ID for usage tracking
-    const usageDocId = `${uid}_${docHash}`;
-    
-    // Get or create usage document
-    const usageDocRef = db.collection('usage_docs').doc(usageDocId);
-    let usageDoc = await usageDocRef.get();
-    
-    // Get user's plan
-    const plan = getUserPlan(uid);
-    
     // Compute scan ratio from stats
     const scanRatio = computeScanRatio(charsPerPage || [], pageCount || 0);
-    
-    // Check if document exists in usage records
-    let aiCallsUsed = 0;
-    if (usageDoc.exists) {
-      const usageData = usageDoc.data();
-      aiCallsUsed = usageData.aiCallsUsed || 0;
-      
-      // Check AI call limits based on plan
-      const aiCallsLimitPerDoc = plan === 'pro' ? CONFIG.PRO_AI_CALLS_PER_DOC : CONFIG.FREE_AI_CALLS_PER_DOC;
-      
-      if (aiCallsUsed >= aiCallsLimitPerDoc) {
-        return {
-          ok: false,
-          code: 'AI_BUDGET_EXCEEDED_PRO_REQUIRED',
-          message: 'AI call limit reached for this document',
-          requiredPlan: plan === 'free' ? 'pro' : plan,
-          usage: {
-            aiCallsUsed,
-            aiCallsRemaining: 0
-          }
-        };
-      }
-      
-      // Check if scanned document with free account
-      if (plan === 'free' && scanRatio > CONFIG.SCAN_RATIO_THRESHOLD) {
-        // Update blocked reason
-        await usageDocRef.update({
-          blockedReason: 'scanned_document_free_tier',
-          lastUsedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-        
-        return {
-          ok: false,
-          code: 'SCAN_DETECTED_PRO_REQUIRED',
-          message: 'Scanned PDFs require OCR (Pro).',
-          requiredPlan: 'pro',
-          usage: {
-            aiCallsUsed,
-            aiCallsRemaining: 0
-          }
-        };
-      }
-    } else {
-      // Create new usage document
-      await usageDocRef.set({
-        uid: uid,
-        docHash: docHash,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        lastUsedAt: admin.firestore.FieldValue.serverTimestamp(),
-        plan: plan,
-        aiCallsUsed: 0,
-        aiTokensEstimated: 0,
-        pageCount: pageCount || 0,
-        scanRatio: scanRatio || 0,
-        blockedReason: null
-      });
+
+    // Enforce OCR gating: scanned PDFs require Pro (no vision model for Free/Anonymous)
+    if (scanRatio > CONFIG.SCAN_RATIO_THRESHOLD && entitlement.tier !== 'pro') {
+      return {
+        ok: false,
+        code: 'SCAN_DETECTED_PRO_REQUIRED',
+        message: 'Scanned PDFs require OCR (Pro).',
+        requiredTier: 'pro',
+      };
     }
+
+    const estimatedTokens = estimateTokensFromChars(totalChars);
+
+    // Enforce token budgets (per uid/puid)
+    const budget = await enforceAndRecordTokenUsage({
+      puid: entitlement.puid,
+      tier: entitlement.tier,
+      estimatedTokens,
+    });
+
+    if (!budget.allowed) {
+      return {
+        ok: false,
+        code: budget.code,
+        message: entitlement.tier === 'anonymous'
+          ? 'Anonymous token limit reached. Create a free account to continue.'
+          : 'Daily token limit reached. Upgrade to Pro to continue.',
+        requiredTier: entitlement.tier === 'anonymous' ? 'free' : 'pro',
+        usage: {
+          estimatedTokens,
+          remainingTokens: budget.remaining,
+        },
+      };
+    }
+
+    // Record docHash ledger (forever retention) for all tiers
+    await db.collection('docshashes').doc(docHash).set(
+      {
+        docHash,
+        lastSeenAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastSeenByPuid: entitlement.puid,
+      },
+      { merge: true }
+    );
     
     // Simulate calling the AI service (this would be your actual LLM call)
     // In a real implementation, this would call your AI service
@@ -335,45 +427,32 @@ exports.analyzeText = functions.https.onCall(async (data, context) => {
     // Validate output schema
     mockAnalysis = validateOutputSchema(mockAnalysis);
     
-    // Update usage counts atomically
-    await db.runTransaction(async (transaction) => {
-      const doc = await transaction.get(usageDocRef);
-      if (!doc.exists) {
-        throw new Error('Usage document does not exist');
-      }
-      
-      const currentUsage = doc.data();
-      transaction.update(usageDocRef, {
-        aiCallsUsed: (currentUsage.aiCallsUsed || 0) + 1,
-        lastUsedAt: admin.firestore.FieldValue.serverTimestamp(),
-        aiTokensEstimated: (currentUsage.aiTokensEstimated || 0) + Math.floor(totalChars / 4)
-      });
-    });
-    
     // Add to usage events (optional logging)
     await db.collection('usage_events').add({
-      uid: uid,
+      puid: entitlement.puid,
+      uid: entitlement.uid,
+      tier: entitlement.tier,
       docHash: docHash,
       event: 'analyze',
       at: admin.firestore.FieldValue.serverTimestamp(),
       meta: {
-        tokens: Math.floor(totalChars / 4),
-        scanRatio: scanRatio
+        estimatedTokens,
+        scanRatio,
       }
     });
-    
-    // Calculate remaining calls
-    const aiCallsLimitPerDoc = plan === 'pro' ? CONFIG.PRO_AI_CALLS_PER_DOC : CONFIG.FREE_AI_CALLS_PER_DOC;
-    const aiCallsRemaining = Math.max(0, aiCallsLimitPerDoc - ((aiCallsUsed || 0) + 1));
-    
+
     return {
       ok: true,
       docHash,
       result: mockAnalysis,
       usage: {
-        aiCallsUsed: (aiCallsUsed || 0) + 1,
-        aiCallsRemaining
-      }
+        estimatedTokens,
+        remainingTokens: budget.remaining,
+      },
+      entitlement: {
+        tier: entitlement.tier,
+        isPro: entitlement.isPro,
+      },
     };
     
   } catch (error) {
@@ -393,31 +472,29 @@ exports.analyzeText = functions.https.onCall(async (data, context) => {
 // Get entitlement function
 exports.getEntitlement = functions.https.onCall(async (data, context) => {
   try {
-    const uid = validateAuth(context);
-    
-    // Get user's plan
-    const plan = getUserPlan(uid);
-    
-    // Define limits based on plan
-    const aiCallsPerDocLimit = plan === 'pro' ? CONFIG.PRO_AI_CALLS_PER_DOC : CONFIG.FREE_AI_CALLS_PER_DOC;
-    
+    const e = await getUserEntitlement(context);
+
     const entitlements = {
-      plan: plan,
-      aiCallsPerDocLimit,
-      storageEnabled: plan !== 'free', // Storage only for Pro+
-      ocrEnabled: plan !== 'free', // OCR only for Pro+
-      maxDocumentSizeMB: plan === 'premium' ? 50 : plan === 'pro' ? 10 : 5
+      tier: e.tier, // anonymous | free | pro
+      isPro: e.isPro,
+
+      // Feature flags
+      storageEnabled: e.tier === 'pro',
+      ocrEnabled: e.tier === 'pro',
+
+      // Budgets
+      anonTokensPerUid: CONFIG.ANON_TOKENS_PER_UID,
+      freeTokensPerDay: CONFIG.FREE_TOKENS_PER_DAY,
     };
-    
+
     return entitlements;
-    
   } catch (error) {
     console.error('Get entitlement error:', error);
-    
+
     if (error instanceof functions.https.HttpsError) {
       throw error;
     }
-    
+
     throw new functions.https.HttpsError(
       'internal',
       'An error occurred while fetching entitlements.'
@@ -445,11 +522,6 @@ const getStripeClient = (adminCfg) => {
   return new Stripe(apiKey, {
     apiVersion: '2024-06-20',
   });
-};
-
-const resolvePuidForUid = async (uid) => {
-  // MVP: puid == uid. Later: look up uid_aliases/{uid} => puid.
-  return uid;
 };
 
 const isStripeProStatus = (status) => {
@@ -600,9 +672,9 @@ exports.cleanupOldUsageRecords = functions.pubsub.schedule('every 24 hours from 
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - CONFIG.TTL_DAYS_USAGE_DOCS);
 
-      // Query for old records
-      const oldRecordsQuery = await db.collection('usage_docs')
-        .where('lastUsedAt', '<', cutoffDate)
+      // Query for old records (rolling daily usage docs only)
+      const oldRecordsQuery = await db.collection('usage_daily')
+        .where('updatedAt', '<', cutoffDate)
         .get();
 
       const batch = db.batch();

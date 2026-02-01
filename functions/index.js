@@ -2,6 +2,7 @@ const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const fs = require('fs');
 const path = require('path');
+const Stripe = require('stripe');
 
 // In production on Firebase, Admin SDK uses application default credentials automatically.
 // For local development (emulators), we optionally bootstrap with a service account JSON file.
@@ -436,6 +437,16 @@ const getStripeAdminConfig = async () => {
   return snap.exists ? snap.data() : null;
 };
 
+const getStripeClient = (adminCfg) => {
+  const apiKey = String(adminCfg?.apiKey || '');
+  if (!apiKey.startsWith('sk_')) {
+    throw new functions.https.HttpsError('failed-precondition', 'Stripe apiKey is missing in Firestore admin/stripe');
+  }
+  return new Stripe(apiKey, {
+    apiVersion: '2024-06-20',
+  });
+};
+
 const resolvePuidForUid = async (uid) => {
   // MVP: puid == uid. Later: look up uid_aliases/{uid} => puid.
   return uid;
@@ -446,6 +457,75 @@ const isStripeProStatus = (status) => {
   // If you later want to treat trialing as Pro, add it here.
   return status === 'active';
 };
+
+// Callable: create a Stripe Checkout Session (Pro subscription)
+exports.stripeCreateCheckoutSession = functions.https.onCall(async (data, context) => {
+  const uid = validateAuth(context);
+  const puid = await resolvePuidForUid(uid);
+
+  const billing = String(data?.billing || 'monthly'); // monthly | annual
+
+  const adminCfg = await getStripeAdminConfig();
+  const stripe = getStripeClient(adminCfg);
+
+  const priceIds = adminCfg?.priceIds || {};
+  const priceId = billing === 'annual' ? priceIds.pro_annual : priceIds.pro_monthly;
+  if (!priceId) {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'Missing price id in Firestore admin/stripe.priceIds for selected billing interval'
+    );
+  }
+
+  const successUrl = String(adminCfg?.successUrl || 'http://localhost:5173/profile?stripe=success');
+  const cancelUrl = String(adminCfg?.cancelUrl || 'http://localhost:5173/pricing?stripe=cancel');
+
+  const session = await stripe.checkout.sessions.create({
+    mode: 'subscription',
+    line_items: [{ price: priceId, quantity: 1 }],
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    client_reference_id: puid,
+    metadata: {
+      firebaseUid: uid,
+      puid,
+      billing,
+    },
+    subscription_data: {
+      metadata: {
+        firebaseUid: uid,
+        puid,
+      },
+    },
+  });
+
+  return { url: session.url, id: session.id };
+});
+
+// Callable: create a Stripe Customer Portal session (receipts + manage subscription)
+exports.stripeCreatePortalSession = functions.https.onCall(async (data, context) => {
+  const uid = validateAuth(context);
+  const puid = await resolvePuidForUid(uid);
+
+  const adminCfg = await getStripeAdminConfig();
+  const stripe = getStripeClient(adminCfg);
+
+  const userSnap = await db.collection('users').doc(puid).get();
+  const customerId = userSnap.exists ? userSnap.data()?.subscription?.customerId : null;
+
+  if (!customerId) {
+    throw new functions.https.HttpsError('failed-precondition', 'No Stripe customerId found for this user');
+  }
+
+  const returnUrl = String(adminCfg?.portalReturnUrl || adminCfg?.successUrl || 'http://localhost:5173/profile');
+
+  const session = await stripe.billingPortal.sessions.create({
+    customer: customerId,
+    return_url: returnUrl,
+  });
+
+  return { url: session.url };
+});
 
 // POST /stripeWebhookMock
 // - For local development: lets us simulate Stripe webhooks.

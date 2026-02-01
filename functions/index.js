@@ -424,6 +424,93 @@ exports.getEntitlement = functions.https.onCall(async (data, context) => {
   }
 });
 
+// --- Stripe (mock webhook + future real webhook) ---
+
+const isEmulatorEnv = () =>
+  !!process.env.FUNCTIONS_EMULATOR ||
+  !!process.env.FIREBASE_EMULATOR_HUB ||
+  !!process.env.FIRESTORE_EMULATOR_HOST;
+
+const getStripeAdminConfig = async () => {
+  const snap = await db.collection('admin').doc('stripe').get();
+  return snap.exists ? snap.data() : null;
+};
+
+const resolvePuidForUid = async (uid) => {
+  // MVP: puid == uid. Later: look up uid_aliases/{uid} => puid.
+  return uid;
+};
+
+const isStripeProStatus = (status) => {
+  // Keep it simple: Stripe webhook is authoritative; we treat active as Pro.
+  // If you later want to treat trialing as Pro, add it here.
+  return status === 'active';
+};
+
+// POST /stripeWebhookMock
+// - For local development: lets us simulate Stripe webhooks.
+// - In non-emulator: requires x-mock-secret header matching admin/stripe.mockWebhookSecret.
+exports.stripeWebhookMock = functions.https.onRequest(async (req, res) => {
+  try {
+    if (req.method !== 'POST') {
+      res.status(405).json({ ok: false, error: 'Method not allowed' });
+      return;
+    }
+
+    const inEmu = isEmulatorEnv();
+    const adminCfg = await getStripeAdminConfig();
+
+    if (!inEmu) {
+      const provided = String(req.get('x-mock-secret') || '');
+      const expected = String(adminCfg?.mockWebhookSecret || '');
+      if (!expected || provided !== expected) {
+        res.status(403).json({ ok: false, error: 'Forbidden' });
+        return;
+      }
+    }
+
+    const event = req.body;
+    const obj = event?.data?.object;
+
+    const stripeStatus = obj?.status;
+    const customerId = obj?.customer;
+    const subscriptionId = obj?.id;
+    const firebaseUid = obj?.metadata?.firebaseUid;
+
+    if (!firebaseUid) {
+      res.status(400).json({ ok: false, error: 'Missing metadata.firebaseUid' });
+      return;
+    }
+
+    const puid = await resolvePuidForUid(firebaseUid);
+    const isPro = isStripeProStatus(stripeStatus);
+
+    await db.collection('users').doc(puid).set(
+      {
+        subscription: {
+          provider: 'stripe',
+          customerId: customerId || null,
+          subscriptionId: subscriptionId || null,
+          status: stripeStatus || null,
+          isPro,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        // Helpful for debugging/migrations
+        lastStripeEvent: {
+          type: event?.type || null,
+          receivedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+      },
+      { merge: true }
+    );
+
+    res.status(200).json({ ok: true, puid, isPro });
+  } catch (e) {
+    console.error('stripeWebhookMock error:', e);
+    res.status(500).json({ ok: false, error: e?.message || 'internal' });
+  }
+});
+
 // TTL cleanup function (scheduled)
 exports.cleanupOldUsageRecords = functions.pubsub.schedule('every 24 hours from 01:00 to 02:00')
   .timeZone('Australia/Sydney')
@@ -432,27 +519,27 @@ exports.cleanupOldUsageRecords = functions.pubsub.schedule('every 24 hours from 
       // Delete usage records older than configured TTL days
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - CONFIG.TTL_DAYS_USAGE_DOCS);
-      
+
       // Query for old records
       const oldRecordsQuery = await db.collection('usage_docs')
         .where('lastUsedAt', '<', cutoffDate)
         .get();
-      
+
       const batch = db.batch();
       let deletedCount = 0;
-      
+
       oldRecordsQuery.forEach((doc) => {
         batch.delete(doc.ref);
         deletedCount++;
       });
-      
+
       if (deletedCount > 0) {
         await batch.commit();
         console.log(`Deleted ${deletedCount} old usage records`);
       } else {
         console.log('No old usage records to delete');
       }
-      
+
       return null;
     } catch (error) {
       console.error('Cleanup error:', error);

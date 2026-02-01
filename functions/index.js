@@ -789,6 +789,114 @@ exports.saveDocTypeOverride = functions.https.onCall(async (data, context) => {
   return { ok: true };
 });
 
+// Returns detected + override + effective document type state.
+exports.getDocumentTypeState = functions.https.onCall(async (data, context) => {
+  const { uid, puid } = await getUserEntitlement(context);
+
+  const docHash = data?.docHash;
+  validateDocHash(docHash);
+
+  const overrideRef = db.collection('doc_type_overrides').doc(`${puid}_${docHash}`);
+  const detectedRef = db.collection('doc_classifications').doc(docHash);
+
+  const [overrideSnap, detectedSnap] = await Promise.all([overrideRef.get(), detectedRef.get()]);
+
+  const overrideTypeId = overrideSnap.exists ? (overrideSnap.data()?.typeId || null) : null;
+  const detected = detectedSnap.exists ? (detectedSnap.data() || null) : null;
+  const detectedTypeId = detected?.typeId || null;
+
+  const effectiveTypeId = overrideTypeId || detectedTypeId || null;
+
+  return {
+    ok: true,
+    uid,
+    puid,
+    docHash,
+    overrideTypeId,
+    detected,
+    effectiveTypeId,
+  };
+});
+
+// Cheap (non-AI) document type detection to seed routing; can be replaced by LLM later.
+exports.detectDocumentType = functions.https.onCall(async (data, context) => {
+  const { uid, puid, tier } = await getUserEntitlement(context);
+
+  const docHash = data?.docHash;
+  validateDocHash(docHash);
+
+  const stats = data?.stats || {};
+  const pageCount = stats?.pageCount || 0;
+  const charsPerPage = Array.isArray(stats?.charsPerPage) ? stats.charsPerPage : [];
+  const totalChars = stats?.totalChars || 0;
+
+  const rawText = String(data?.text || '');
+  const text = rawText.slice(0, 250000); // hard cap
+  const lower = text.toLowerCase();
+
+  const scanRatio = computeScanRatio(charsPerPage, pageCount);
+
+  let intakeCategory = 'GENERAL';
+  let typeId = null;
+  let confidence = 0.35;
+  let reasons = [];
+
+  if (!text.trim() || totalChars < 20) {
+    intakeCategory = 'UNREADABLE';
+    typeId = 'unreadable_empty';
+    confidence = 0.9;
+    reasons.push({ code: 'NO_TEXT', detail: 'No extractable text' });
+  } else if (scanRatio > CONFIG.SCAN_RATIO_THRESHOLD) {
+    // scanned documents often need OCR; don’t pretend we know the exact type
+    intakeCategory = 'GENERAL';
+    typeId = 'unreadable_broken';
+    confidence = 0.45;
+    reasons.push({ code: 'SCAN_LIKELY', detail: `scanRatio=${scanRatio.toFixed(2)}` });
+  } else if (/(\binvoice\b|\btax invoice\b|\babn\b|\bgst\b)/.test(lower)) {
+    intakeCategory = 'BUSINESS_LEGAL';
+    typeId = 'business_invoice';
+    confidence = 0.75;
+    reasons.push({ code: 'KEYWORDS', detail: 'invoice/tax invoice/gst' });
+  } else if (/(\boffer letter\b|\bjob offer\b|\bwe are pleased to offer\b|\bcommencement date\b|\bremuneration\b)/.test(lower)) {
+    intakeCategory = 'BUSINESS_LEGAL';
+    typeId = 'legal_job_offer';
+    confidence = 0.7;
+    reasons.push({ code: 'KEYWORDS', detail: 'job offer/offer letter/remuneration' });
+  } else if (/(\bsop\b|\bprocedure\b|\bwork instruction\b|\bstep\s+\d+\b)/.test(lower)) {
+    intakeCategory = 'GENERAL';
+    typeId = 'general_sop_procedure';
+    confidence = 0.65;
+    reasons.push({ code: 'KEYWORDS', detail: 'sop/procedure/work instruction' });
+  } else if (/(\bprivacy policy\b|\bpersonal information\b|\bdata collection\b)/.test(lower)) {
+    intakeCategory = 'BUSINESS_LEGAL';
+    typeId = 'policy_privacy';
+    confidence = 0.65;
+    reasons.push({ code: 'KEYWORDS', detail: 'privacy policy/data collection' });
+  } else {
+    intakeCategory = 'GENERAL';
+    typeId = 'legal_contract_generic';
+    confidence = 0.4;
+    reasons.push({ code: 'FALLBACK', detail: 'default fallback' });
+  }
+
+  const ref = db.collection('doc_classifications').doc(docHash);
+  await ref.set(
+    {
+      docHash,
+      intakeCategory,
+      typeId,
+      confidence,
+      reasons,
+      tier,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      model: 'heuristic-v1',
+    },
+    { merge: true }
+  );
+
+  return { ok: true, uid, puid, docHash, intakeCategory, typeId, confidence, reasons };
+});
+
 exports.cleanupOldUsageRecords = functions.pubsub.schedule('every 24 hours from 01:00 to 02:00')
   .timeZone('Australia/Sydney')
   .onRun(async (context) => {

@@ -761,6 +761,34 @@ exports.stripeWebhookMock = functions.https.onRequest(async (req, res) => {
 });
 
 // TTL cleanup function (scheduled)
+// Save per-user document type override (users are isolated)
+// Stored by puid+docHash so different users can have different classifications.
+exports.saveDocTypeOverride = functions.https.onCall(async (data, context) => {
+  const { uid, puid } = await getUserEntitlement(context);
+
+  const docHash = data?.docHash;
+  const typeId = String(data?.typeId || '').trim();
+
+  validateDocHash(docHash);
+  if (!typeId || typeId.length > 80) {
+    throw new functions.https.HttpsError('invalid-argument', 'typeId is required');
+  }
+
+  const ref = db.collection('doc_type_overrides').doc(`${puid}_${docHash}`);
+  await ref.set(
+    {
+      puid,
+      uid,
+      docHash,
+      typeId,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  return { ok: true };
+});
+
 exports.cleanupOldUsageRecords = functions.pubsub.schedule('every 24 hours from 01:00 to 02:00')
   .timeZone('Australia/Sydney')
   .onRun(async (context) => {

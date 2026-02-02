@@ -39,6 +39,21 @@
           "destination": "/index.html"
         }
       ]
+    },
+    {
+      "site": "decodocs-admin",
+      "public": "decodocs/admin/dist",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ]
     }
   ],
   "firestore": {

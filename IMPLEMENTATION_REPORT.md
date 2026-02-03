@@ -13,7 +13,7 @@ All 9 identified issues from `Issues.md` have been successfully addressed:
 | Issue | Status | Implementation | Impact |
 |-------|--------|----------------|--------|
 | #1 Auth Failure | ✅ FIXED | Soft error handling + error boundary | PDF viewing independent of auth |
-| #2 Exposed Secrets | ✅ FIXED | Moved to .env.example | Safe for public repos |
+| #2 Secrets | ✅ FIXED | Firestore + Firebase Native Config | Strict "No .env" policy enforced |
 | #3 Test Coverage | ✅ FIXED | 18 unit/integration tests added | 4 new test files |
 | #4 Submodule | ✅ VERIFIED | Already checked out | All changes applied in-place |
 
@@ -68,47 +68,39 @@ Created a three-layer error handling system:
 
 ---
 
-## 🔐 Issue #2: Exposed Secrets
+## 🔐 Issue #2: Secret Management Policy (No Environment Variables)
 
 ### Problem Statement
-Sensitive information (API keys, private keys, service account JSON) was exposed in:
-- `SETUP_INSTRUCTIONS.md`
-- Configuration examples in code comments
-- Documentation visible to all
+Sensitive information was previously exposed in documentation. Additionally, the project needed to strictly enforce the "No Environment Variables" policy to ensure security and consistency.
 
 ### Solution Implemented
 
-1. **Removed all secrets from documentation**
-   - Deleted hardcoded API keys
-   - Removed private key content
-   - Deleted service account JSON
+1. **Strict Prohibition of `.env`**
+   - Removed all `.env` and `.env.example` files.
+   - Deleted all references to environment variables in documentation and code comments.
 
-2. **Created `.env.example` template**
-   ```env
-   VITE_FIREBASE_API_KEY=
-   VITE_FIREBASE_AUTH_DOMAIN=snapsign-au.firebaseapp.com
-   VITE_FIREBASE_PROJECT_ID=snapsign-au
-   VITE_FIREBASE_STORAGE_BUCKET=snapsign-au.appspot.com
-   VITE_FIREBASE_MESSAGING_SENDER_ID=
-   VITE_FIREBASE_APP_ID=
-   ```
+2. **Firebase Native Configuration**
+   - Reverted to using native Firebase configuration files (`firebase.json`, `firestore.rules`).
+   - Configuration is managed exclusively via the Firebase CLI.
 
-3. **Updated SETUP_INSTRUCTIONS.md**
-   - References env variables by name
-   - Links to Firebase Console for obtaining values
-   - Explains how to set up environment files
-   - Safe to commit to public repositories
+3. **Firestore Secrets Management**
+   - Application-level secrets (API keys, service credentials, etc.) are now stored securely in **Firestore**.
+   - These secrets are fetched at runtime by the application, providing a secure and unified source of truth.
+
+4. **Updated Documentation**
+   - Added a **STRICT NOTE** to all setup guides: Environment variables are NOT used in this project.
+   - Updated `SETUP_INSTRUCTIONS.md` to explain the Firebase/Firestore-based configuration workflow.
 
 ### Result
-✅ No API keys visible in documentation  
-✅ No private keys exposed  
-✅ Clear guidance on obtaining real values  
-✅ Safe for public repositories  
-✅ Multi-environment support ready  
+✅ Zero reliance on local `.env` files.
+✅ Centralized secret management via Firestore.
+✅ No risk of sensitive data leaks through environment variable mismanagement.
+✅ 100% consistent with the project's architectural standards.
 
 ### Files Modified
-- `SETUP_INSTRUCTIONS.md` - Secrets removed, references env vars
-- `decodocs-repo/web/.env.example` - New template with placeholders
+- `SETUP_INSTRUCTIONS.md` - Overhauled for Firebase/Firestore config
+- 🗑️ `decodocs/web/.env.example` - Deleted
+
 
 ---
 
@@ -209,9 +201,9 @@ npm test
 
 ### Security
 - ✅ 100% removal of hardcoded credentials from documentation
-- ✅ Secrets now managed via environment variables
+- ✅ **STRICT POLICY**: No environment variables used
+- ✅ Secrets managed via Firestore and Firebase native config
 - ✅ Safe for public repositories
-- ✅ Clear guidance on credential management
 
 ### Reliability
 - ✅ Application continues working when auth fails
@@ -244,10 +236,10 @@ npx playwright test
 
 ### Set Up Local Development
 ```bash
-cd decodocs-repo/web
-cp .env.example .env.local
-# Edit .env.local with your Firebase credentials
-npm run dev
+# Ensure Firebase CLI is logged in
+firebase login
+# Use Firebase emulators for local dev
+firebase emulators:start
 ```
 
 ### Monitor Error Tracking

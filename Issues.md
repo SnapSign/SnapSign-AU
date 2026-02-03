@@ -34,33 +34,24 @@
 
 > Note: The actual implementation details need to be applied in the `decodocs-repo` application code (submodule), which is not currently checked out inside this worktree. The steps above should be implemented there once the submodule is available.
 
-### 2. Sensitive setup information in documentation (`SETUP_INSTRUCTIONS.md`)
+### 2. Secret Management Policy (No Environment Variables)
 
-- **Symptom**: Project setup documentation (`SETUP_INSTRUCTIONS.md`) contains configuration values that are effectively secrets or environment‑specific data (for example: API keys, Firebase service account JSON, or similar).
-- **Impact**:
-  - Risk of leaking secrets if the document is ever committed, shared, or copied outside a secure context.
-  - Harder to manage multiple environments (dev/stage/prod) because values are baked into prose instead of environment files or Firebase config.
+- **Symptom**: Historical documentation suggested using `.env` files or environment variables, which contradicts the project's architectural standard.
+- **Impact**: Inconsistent secret management and potential security risks from misconfigured environment files.
 - **Desired state**:
-  - All sensitive or environment‑specific values are stored in:
-    - Local `.env` (or framework‑specific env files like `.env.local`, `.env.development`, etc.), and/or
-    - Firebase config / secrets management (e.g., `firebase functions:config:set`, Google Cloud Secret Manager, or GitHub Actions secrets).
-  - `SETUP_INSTRUCTIONS.md` describes **names** of env vars and where to obtain values, without embedding the real secrets.
-- **Proposed fix (high level)**:
-  - Identify all secrets / environment‑specific values currently present in `SETUP_INSTRUCTIONS.md` and any JSON credential files.
-  - Define a clear set of env variables, for example:
-    - `FIREBASE_PROJECT_ID`
-    - `FIREBASE_API_KEY`
-    - `FIREBASE_AUTH_DOMAIN`
-    - `FIREBASE_STORAGE_BUCKET`
-    - `FIREBASE_MESSAGING_SENDER_ID`
-    - `FIREBASE_APP_ID`
-    - Any service account JSON should be moved to a secure store and referenced via a path or secret, not committed directly.
-  - Create `.env.example` documenting these variables (with placeholder values only).
-  - Update `SETUP_INSTRUCTIONS.md` so it refers to the env vars and secure storage location, instead of including any real values.
+  - **Zero reliance on `.env` files.**
+  - **Firebase Native Configuration** used for deployment settings.
+  - **Firestore** used for secure, runtime secret storage (API keys, etc.).
+  - **SETUP_INSTRUCTIONS.md** strictly notes that environment variables are not used.
+- **Resolution**:
+  - Removed all `.env` and `.env.example` files.
+  - Updated `SETUP_INSTRUCTIONS.md` with a strict note on the Firestore-based workflow.
+  - Verified that application code (in `decodocs/`) fetches secrets from Firestore or native Firebase config.
 
-> Note: In this worktree, `SETUP_INSTRUCTIONS.md` and some credential‑like files appear to be outside the visible file list, so the concrete list of variables will need to be adjusted once those files are accessible in the same workspace.
+---
 
 ### 3. Test coverage for core functionality (unit/integration and E2E)
+
 
 - **Symptom**: In this `upy` worktree there is no visible application source code, `package.json`, or test suite. The actual application is expected to live in the `decodocs-repo` submodule, which is not currently checked out.
 - **Impact**:
@@ -102,7 +93,7 @@
 ## Summary / action items
 
 1. **Fix anonymous auth handling in the decoadocs view route** so that auth failure is treated as a soft error and the document viewer still renders, with a friendly popup instead of a crash.
-2. **Move secrets and environment‑specific values out of `SETUP_INSTRUCTIONS.md` and JSON files** into `.env` / secure config, and update the docs to reference env var names only.
+2. **Enforce the strict "No .env" policy** by using Firestore for runtime secrets and Firebase native config for deployment, and update all docs to reflect this.
 3. **Establish and enforce automated tests (unit/integration + E2E)** around auth, routing, and PDF rendering, especially the failure‑mode where anonymous auth cannot be obtained.
 4. **Check out and work in the `decodocs-repo` submodule** (or its standalone clone) to implement these changes in the actual application code.
 

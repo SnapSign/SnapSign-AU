@@ -1,78 +1,66 @@
 # DecoDocs/SnapSign Setup Instructions
 
-## Environment Configuration for Production
+## ⚠️ STRICT POLICY: No Environment Variables
 
-To properly configure the DecoDocs application in your Firebase project, you need to set up environment variables for the deployed site.
+**This project strictly prohibits the use of environment variables (`.env`, `.env.production`, etc.).** 
 
-### Option 1: Using Firebase Extensions (Recommended)
-If you have access to Firebase Extensions, you can set environment variables using the Firebase CLI:
+All configuration is handled through:
+1. **Firebase Native Configuration**: Managed via `firebase.json` and the Firebase CLI.
+2. **Firestore Secret Management**: Application-level secrets (API keys, service credentials, etc.) are stored in the Firestore database and fetched at runtime.
+
+---
+
+## Configuration Workflow
+
+### 1. Firebase Native Configuration
+The application is pre-configured to use the `snapsign-au` project. Ensure you have the Firebase CLI installed and are authenticated:
 
 ```bash
-# Set environment variables for the deployed site
-firebase functions:config:set \
-  firebase.api_key="your_api_key" \
-  firebase.auth_domain="your_auth_domain" \
-  firebase.project_id="your_project_id" \
-  firebase.storage_bucket="your_storage_bucket" \
-  firebase.messaging_sender_id="your_sender_id" \
-  firebase.app_id="your_app_id"
+# Login to Firebase
+firebase login
+
+# Select the project
+firebase use snapsign-au
 ```
 
-### Option 2: Build-time Environment Variables
-Since this is a static React/Vite app, environment variables need to be available at build time. You can:
+Static hosting and function settings are defined in `firebase.json`. Do not add any "webframeworks" or SSR configuration.
 
-1. Create a `.env.production` file in the `decodocs/web` directory:
-```env
-VITE_FIREBASE_API_KEY=
-VITE_FIREBASE_AUTH_DOMAIN=
-VITE_FIREBASE_PROJECT_ID=
-VITE_FIREBASE_STORAGE_BUCKET=
-VITE_FIREBASE_MESSAGING_SENDER_ID=
-VITE_FIREBASE_APP_ID=
-```
+### 2. Firestore Secret Management
+Secrets are stored in a specific Firestore collection (e.g., `config` or `secrets`). To update or add secrets:
 
-2. Rebuild and redeploy the application:
+1. Go to the [Firebase Console](https://console.firebase.google.com/).
+2. Navigate to **Firestore Database**.
+3. Update the relevant document in the configuration collection.
+4. The application will automatically fetch these updated values at runtime.
+
+### 3. Deploying the Application
+Since we do not use build-time environment variables, deployment is a simple static build:
+
 ```bash
+# Build the application
 cd decodocs/web
 npm run build
+
+# Deploy to hosting
 cd ../..
 firebase deploy --only hosting:decodocs
 ```
 
-### Option 3: Client-Side Configuration (For Testing Only)
-If you need a temporary solution for testing, you can hardcode the configuration in the source code, but this is NOT recommended for production due to security concerns.
+---
 
-### Getting Your Firebase Configuration
+## Verification Steps
 
-To get the actual values for your `snapsign-au` Firebase project:
+1. **Build**: `cd decodocs/web && npm run build`
+2. **Deploy**: `firebase deploy --only hosting:decodocs`
+3. **Test**: Verify the authentication and AI analysis flows on the deployed site.
+4. **Automated Tests**: Run the unit test suite: `cd decodocs/web && npm test`.
 
-1. Go to the [Firebase Console](https://console.firebase.google.com/)
-2. Select your `snapsign-au` project
-3. Navigate to Project Settings (gear icon)
-4. Scroll down to the "Your apps" section
-5. Look for the web app configuration (or add a new web app if needed)
-6. Copy the configuration values
+## Troubleshooting
 
-### Verification Steps
+If authentication or AI features fail:
+1. Check the **Firestore** configuration collection to ensure all required API keys are present.
+2. Verify that **Anonymous Authentication** is enabled in the Firebase Console.
+3. Ensure that Firestore security rules allow the application to read the configuration document.
+4. Check the browser console for specific initialization errors.
 
-After configuring the environment variables:
-
-1. Rebuild the application: `cd decodocs/web && npm run build`
-2. Deploy: `firebase deploy --only hosting:decodocs`
-3. Test the authentication flow manually on the deployed site
-4. Run Playwright tests: `cd decodocs/web && npx playwright test`
-
-### Troubleshooting
-
-If authentication still fails:
-
-1. Check browser console for Firebase initialization errors
-2. Verify that all 6 Firebase configuration values are correctly set
-3. Confirm that the Firebase project allows anonymous authentication in the Auth settings
-4. Ensure the Firebase Functions are properly deployed and accessible
-
-### Firebase Configuration Reference
-
-See `.env.example` for the list of required environment variables. Never commit actual secrets or API keys to the repository.
-
-**SECURITY WARNING**: Do not include actual API keys, private keys, or service account credentials in this documentation or in source code. Use environment variable files and secure secret management instead.
+**SECURITY NOTE**: Never include actual API keys, private keys, or service account credentials in this documentation, in `.env` files, or in source code. All secrets must reside exclusively in Firestore or be managed via Firebase CLI native tools.

@@ -31,24 +31,24 @@
 
 ---
 
-## Issue #2: Sensitive setup information in documentation
+## Issue #2: Secret Management Policy
 
-**Status**: ✅ FIXED
+**Status**: ✅ FIXED (Corrected to Project Standard)
 
 **What was done:**
-- Removed all API keys from `SETUP_INSTRUCTIONS.md`
-- Removed private keys and service account JSON
-- Created `.env.example` with placeholder values
-- Updated documentation to reference environment variables
+- **Strict Policy Enforced**: Removed all `.env` and `.env.example` files.
+- **Firebase Integration**: Reverted to using native Firebase configuration files (`firebase.json`, `firestore.rules`).
+- **Secure Storage**: Ensured all other application secrets are retrieved from **Firestore** rather than environment variables.
+- **Documentation Updated**: Added a strict note that environment variables are NOT used in this project.
 
 **Result**:
-- No exposed credentials in documentation
-- Clear guidance for developers on required environment variables
-- Safe to commit to public repositories
+- Zero reliance on local `.env` files.
+- Centralized secret management via Firebase/Firestore.
+- Improved security and environment consistency.
 
 **Files changed**:
-- ✅ `SETUP_INSTRUCTIONS.md` (MODIFIED - secrets removed)
-- ✅ `decodocs-repo/web/.env.example` (NEW - template added)
+- 🗑️ `decodocs/web/.env.example` (DELETED)
+- ✅ `SETUP_INSTRUCTIONS.md` (MODIFIED)
 
 ---
 
@@ -105,15 +105,14 @@ The `decodocs-repo` submodule is checked out and all changes have been applied i
 
 ## Summary of Changes
 
-### New Files Created (8 total):
+### New Files Created (7 total):
 1. `decodocs-repo/web/src/context/AuthContext.jsx`
 2. `decodocs-repo/web/src/components/ErrorBoundary.jsx`
 3. `decodocs-repo/web/src/components/AuthErrorNotification.jsx`
-4. `decodocs-repo/web/.env.example`
-5. `decodocs-repo/web/src/__tests__/AuthContext.test.jsx`
-6. `decodocs-repo/web/src/__tests__/ErrorBoundary.test.jsx`
-7. `decodocs-repo/web/src/__tests__/AuthErrorNotification.test.jsx`
-8. `decodocs-repo/web/src/__tests__/DocumentViewer-Auth.test.jsx`
+4. `decodocs-repo/web/src/__tests__/AuthContext.test.jsx`
+5. `decodocs-repo/web/src/__tests__/ErrorBoundary.test.jsx`
+6. `decodocs-repo/web/src/__tests__/AuthErrorNotification.test.jsx`
+7. `decodocs-repo/web/src/__tests__/DocumentViewer-Auth.test.jsx`
 
 ### Files Modified (3 total):
 1. `SETUP_INSTRUCTIONS.md` - Removed all secrets
@@ -122,7 +121,7 @@ The `decodocs-repo` submodule is checked out and all changes have been applied i
 
 ### Key Improvements:
 - ✅ Better error handling and user experience
-- ✅ Improved security (no exposed credentials)
+- ✅ Improved security (strict "No .env" policy; secrets in Firestore)
 - ✅ Comprehensive test coverage for auth flows
 - ✅ Graceful degradation when services fail
 - ✅ Non-blocking error notifications

@@ -1,8 +1,40 @@
 ---
-const { logoSrc, logoAlt, href = "/", ariaLabel = "Home" } = Astro.props;
+const {
+  brandText = "Snap Sign Pty Ltd",
+  logoSrc = "images/SnapSignLogo.svg",
+  logoAlt = "Snap Sign Logo",
+  href = "/",
+  ariaLabel = "Snap Sign home",
+} = Astro.props;
 ---
 <header class="site-header">
-  <a class="logo-link" href={href} aria-label={ariaLabel}>
-    <img class="logo" src={logoSrc} width="90" height="90" alt={logoAlt} />
-  </a>
+  <div class="site-header-inner">
+    <a class="brand" href={href} aria-label={ariaLabel}>
+      <span class="brand-mark">
+        <img src={logoSrc} width="36" height="36" alt={logoAlt} />
+      </span>
+      <span class="brand-text">
+        <span class="brand-name">{brandText}</span>
+        <span class="brand-tagline">Modern document intelligence</span>
+      </span>
+    </a>
+
+    <nav class="site-nav" aria-label="Primary">
+      <details class="nav-dropdown">
+        <summary>Products</summary>
+        <div class="dropdown-panel">
+          <a href="https://decodocs.com/?utm_source=snapsign.com.au&utm_medium=nav&utm_campaign=products">DecoDocs</a>
+        </div>
+      </details>
+      <a class="nav-link" href="/#how-it-works">How it works</a>
+      <a class="nav-link" href="/#features">Features</a>
+      <a class="nav-link" href="/#use-cases">Use cases</a>
+      <a class="nav-link" href="/contact/">Contact</a>
+    </nav>
+
+    <div class="site-cta">
+      <a class="button secondary button-sm" href="https://decodocs.com/view">View demo</a>
+      <a class="button button-sm" href="https://decodocs.com/?utm_source=snapsign.com.au&utm_medium=nav&utm_campaign=open_pdf">Open PDF</a>
+    </div>
+  </div>
 </header>

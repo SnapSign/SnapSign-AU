@@ -5,7 +5,7 @@ import SiteHeader from "../components/SiteHeader.astro";
 const title = "Find Risky Clauses Before They Cause Trouble | DecoDocs";
 const description =
   "DecoDocs scans your documents to highlight risks, obligations, and one-sided terms freelancers often miss.";
-const canonical = "https://snapsign.com.au/find-risky-clauses.html";
+const canonical = "https://snapsign.com.au/find-risky-clauses/";
 const twitterDescription =
   "DecoDocs scans your documents to highlight risks, obligations, and one-sided terms.";
 ---
@@ -17,16 +17,15 @@ const twitterDescription =
   twitterDescription={twitterDescription}
 >
   <div class="container">
-    <SiteHeader
-      logoSrc="images/DecoDocsLogo.svg"
-      logoAlt="DecoDocs Logo"
-      ariaLabel="Snap Sign home"
-    />
+    <SiteHeader />
 
-    <h1>Find risky clauses before they cause trouble</h1>
-    <h2>DecoDocs scans your documents to highlight risks, obligations, and one-sided terms freelancers often miss</h2>
+    <section class="page-hero">
+      <span class="eyebrow">DecoDocs use case</span>
+      <h1>Find risky clauses before they cause trouble</h1>
+      <h2>DecoDocs scans your documents to highlight risks, obligations, and one-sided terms freelancers often miss</h2>
 
-    <a href="https://decodocs.com" class="button">Upload a Document to Check Risks</a>
+      <a href="https://decodocs.com" class="button">Upload a Document to Check Risks</a>
+    </section>
 
     <div class="problem-section">
       <h3>The Problem</h3>

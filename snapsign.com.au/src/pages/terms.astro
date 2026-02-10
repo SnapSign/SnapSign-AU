@@ -1,0 +1,16 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+
+const title = "Terms of Service | Snap Sign Pty Ltd";
+const description = "Terms of service for Snap Sign Pty Ltd and DecoDocs.";
+const canonical = "https://snapsign.com.au/terms/";
+---
+<BaseLayout title={title} description={description} canonical={canonical}>
+  <div class="container">
+    <SiteHeader />
+    <h1>Terms of Service</h1>
+    <p>Terms are being finalized. Contact us for early access terms.</p>
+    <p>Contact: <a href="mailto:team@snapsign.com">team@snapsign.com</a> or <a href="mailto:iryna@snapsign.com.au">iryna@snapsign.com.au</a></p>
+  </div>
+</BaseLayout>

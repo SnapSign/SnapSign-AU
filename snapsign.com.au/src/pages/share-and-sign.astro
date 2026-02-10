@@ -5,7 +5,7 @@ import SiteHeader from "../components/SiteHeader.astro";
 const title = "Share and Sign Documents with Confidence | DecoDocs";
 const description =
   "DecoDocs lets you understand documents first -- then share and sign them knowing exactly what you're agreeing to.";
-const canonical = "https://snapsign.com.au/share-and-sign.html";
+const canonical = "https://snapsign.com.au/share-and-sign/";
 const twitterDescription =
   "Understand documents first, then share and sign knowing exactly what you're agreeing to.";
 ---
@@ -17,16 +17,15 @@ const twitterDescription =
   twitterDescription={twitterDescription}
 >
   <div class="container">
-    <SiteHeader
-      logoSrc="images/DecoDocsLogo.svg"
-      logoAlt="DecoDocs Logo"
-      ariaLabel="Snap Sign home"
-    />
+    <SiteHeader />
 
-    <h1>Share and sign documents with confidence</h1>
-    <h2>DecoDocs lets you understand documents first -- then share and sign them knowing exactly what you're agreeing to</h2>
+    <section class="page-hero">
+      <span class="eyebrow">DecoDocs use case</span>
+      <h1>Share and sign documents with confidence</h1>
+      <h2>DecoDocs lets you understand documents first -- then share and sign them knowing exactly what you're agreeing to</h2>
 
-    <a href="https://decodocs.com" class="button">Upload a Document to Get Started</a>
+      <a href="https://decodocs.com" class="button">Upload a Document to Get Started</a>
+    </section>
 
     <div class="problem-section">
       <h3>The Problem</h3>

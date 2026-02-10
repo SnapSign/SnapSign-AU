@@ -1,0 +1,17 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+
+const title = "Contact Snap Sign Pty Ltd";
+const description = "Contact Snap Sign Pty Ltd for company inquiries or DecoDocs support.";
+const canonical = "https://snapsign.com.au/contact/";
+---
+<BaseLayout title={title} description={description} canonical={canonical}>
+  <div class="container">
+    <SiteHeader />
+    <h1>Contact Us</h1>
+    <p>General company inquiries: <a href="mailto:team@snapsign.com">team@snapsign.com</a></p>
+    <p>DecoDocs support: <a href="mailto:iryna@snapsign.com.au">iryna@snapsign.com.au</a></p>
+    <p>Partnerships: <a href="/partner">Partner with Us</a></p>
+  </div>
+</BaseLayout>

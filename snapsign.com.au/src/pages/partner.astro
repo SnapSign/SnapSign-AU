@@ -1,0 +1,28 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+
+const title = "Partner with Snap Sign Pty Ltd";
+const description = "Collaboration and NDA process for Snap Sign Pty Ltd.";
+const canonical = "https://snapsign.com.au/partner/";
+---
+<BaseLayout title={title} description={description} canonical={canonical}>
+  <div class="container">
+    <SiteHeader />
+    <h1>Partner with Us</h1>
+    <p>
+      We collaborate with partners who share our mission to improve document clarity and security.
+      If you need an NDA before sharing details, we have a simple process.
+    </p>
+    <h2>NDA Procedure</h2>
+    <ol>
+      <li>Email <a href="mailto:team@snapsign.com">team@snapsign.com</a> with a brief overview of your project.</li>
+      <li>We will send a mutual NDA for review and signature.</li>
+      <li>After execution, we schedule a call and share the relevant materials.</li>
+      <li>We outline next steps and points of contact for collaboration.</li>
+    </ol>
+    <p>
+      For DecoDocs product partnerships, include "DecoDocs" in the subject line.
+    </p>
+  </div>
+</BaseLayout>

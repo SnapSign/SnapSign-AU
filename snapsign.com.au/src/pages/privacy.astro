@@ -1,0 +1,16 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+
+const title = "Privacy Policy | Snap Sign Pty Ltd";
+const description = "Privacy policy for Snap Sign Pty Ltd and DecoDocs.";
+const canonical = "https://snapsign.com.au/privacy/";
+---
+<BaseLayout title={title} description={description} canonical={canonical}>
+  <div class="container">
+    <SiteHeader />
+    <h1>Privacy Policy</h1>
+    <p>We're preparing a full privacy policy. For now, contact us for details about data handling.</p>
+    <p>Contact: <a href="mailto:team@snapsign.com">team@snapsign.com</a> or <a href="mailto:iryna@snapsign.com.au">iryna@snapsign.com.au</a></p>
+  </div>
+</BaseLayout>

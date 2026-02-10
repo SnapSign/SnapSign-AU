@@ -1,0 +1,68 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+
+const title = "Translate Business Documents Instantly | DecoDocs";
+const description =
+  "DecoDocs translates documents into your preferred language so you can understand and act on them confidently.";
+const canonical = "https://snapsign.com.au/translate-documents/";
+const twitterDescription =
+  "DecoDocs translates documents into your preferred language so you can understand and act on them confidently.";
+---
+<BaseLayout
+  title={title}
+  description={description}
+  canonical={canonical}
+  ogUrl={canonical}
+  twitterDescription={twitterDescription}
+>
+  <div class="container">
+    <SiteHeader />
+
+    <section class="page-hero">
+      <span class="eyebrow">DecoDocs use case</span>
+      <h1>Translate business documents instantly</h1>
+      <h2>DecoDocs translates documents into your preferred language so you can understand and act on them confidently</h2>
+
+      <a href="https://decodocs.com" class="button">Upload a Document to Translate</a>
+    </section>
+
+    <div class="problem-section">
+      <h3>The Problem</h3>
+      <p>
+        Language barriers make it difficult to understand important business documents, leading to misunderstandings and risky decisions.
+      </p>
+    </div>
+
+    <div class="benefits-section">
+      <h3>What You Get</h3>
+      <ul>
+        <li><strong>Accurate translations</strong> of full documents or selected sections</li>
+        <li><strong>Side-by-side view</strong> of original and translated text</li>
+        <li><strong>Clear understanding</strong> in your preferred language</li>
+      </ul>
+    </div>
+
+    <div class="how-section">
+      <h3>How DecoDocs Helps</h3>
+      <ul>
+        <li>Translates documents into multiple languages</li>
+        <li>Shows translations alongside the original text</li>
+        <li>Helps you act with confidence on international agreements</li>
+      </ul>
+      <p><strong>No more guessing what foreign-language documents mean.</strong></p>
+    </div>
+
+    <div class="how-it-works">
+      <h3>How It Works</h3>
+      <ol>
+        <li>Upload a document</li>
+        <li>Select your target language</li>
+        <li>Read the translation and understand before acting</li>
+      </ol>
+    </div>
+
+    <a href="https://decodocs.com" class="button">Upload a Document and Translate It</a>
+
+  </div>
+</BaseLayout>

@@ -5,7 +5,7 @@ import SiteHeader from "../components/SiteHeader.astro";
 const title = "Manage All Your Business Documents in One Place | DecoDocs";
 const description =
   "DecoDocs helps freelancers and small businesses store, organize, and reuse documents -- with understanding built in.";
-const canonical = "https://snapsign.com.au/manage-documents.html";
+const canonical = "https://snapsign.com.au/manage-documents/";
 const twitterDescription = "Store, organize, and reuse documents with understanding built in.";
 ---
 <BaseLayout
@@ -16,16 +16,15 @@ const twitterDescription = "Store, organize, and reuse documents with understand
   twitterDescription={twitterDescription}
 >
   <div class="container">
-    <SiteHeader
-      logoSrc="images/DecoDocsLogo.svg"
-      logoAlt="DecoDocs Logo"
-      ariaLabel="Snap Sign home"
-    />
+    <SiteHeader />
 
-    <h1>Manage all your business documents in one place</h1>
-    <h2>DecoDocs helps freelancers and small businesses store, organize, and reuse documents -- with understanding built in</h2>
+    <section class="page-hero">
+      <span class="eyebrow">DecoDocs use case</span>
+      <h1>Manage all your business documents in one place</h1>
+      <h2>DecoDocs helps freelancers and small businesses store, organize, and reuse documents -- with understanding built in</h2>
 
-    <a href="https://decodocs.com" class="button">Start Your Document Workspace</a>
+      <a href="https://decodocs.com" class="button">Start Your Document Workspace</a>
+    </section>
 
     <div class="problem-section">
       <h3>The Problem</h3>

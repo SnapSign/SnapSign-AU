@@ -1,5 +1,4 @@
 User-agent: *
 Allow: /
 
-# If/when a sitemap is added, uncomment and set the correct URL.
-# Sitemap: https://snapsign.com.au/sitemap.xml
+Sitemap: https://snapsign.com.au/sitemap.xml

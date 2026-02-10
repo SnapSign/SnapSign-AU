@@ -2,11 +2,11 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 import SiteHeader from "../components/SiteHeader.astro";
 
-const title = "Snap Sign Pty Ltd | Digital Signature Solutions";
+const title = "Snap Sign Pty Ltd | Corporate Site";
 const description =
-  "Snap Sign Pty Ltd offers user-friendly, secure, and cost-effective digital signature solutions. Empowering businesses and individuals to go paperless with our AI-powered DecoDocs platform.";
+  "Snap Sign Pty Ltd is a startup building AI tools for document clarity and security. DecoDocs is the flagship product.";
 const ogDescription =
-  "Snap Sign Pty Ltd offers user-friendly, secure, and FREE digital signature solutions. Empowering businesses and individuals to go paperless with our AI-powered DecoDocs platform.";
+  "Snap Sign Pty Ltd is a startup building AI tools for document clarity and security. DecoDocs is the flagship product.";
 const canonical = "https://snapsign.com.au/";
 ---
 <BaseLayout
@@ -17,146 +17,225 @@ const canonical = "https://snapsign.com.au/";
   ogUrl={canonical}
   ogSiteName="Snap Sign Pty Ltd"
 >
-  <Fragment slot="head">
-    <script is:inline>
-      (function () {
-        var canonicalHost = "snapsign.com.au";
-        var host = location.host;
-        var isFirebase = host.endsWith(".web.app") || host.endsWith(".firebaseapp.com");
-        if (isFirebase && host !== canonicalHost) {
-          location.replace(
-            "https://" + canonicalHost + location.pathname + location.search + location.hash
-          );
-        }
-      })();
-    </script>
-  </Fragment>
 
   <div class="container">
-    <SiteHeader
-      logoSrc="images/SnapSignLogo.svg"
-      logoAlt="Snap Sign Logo"
-      ariaLabel="Snap Sign home"
-    />
+    <SiteHeader />
 
-    <h1>
-      Understand Your Documents Before You Sign
-    </h1>
-    <h2>
-      DecoDocs explains contracts in plain English, highlights risks, and helps you sign with confidence
-    </h2>
-    <p class="problem-statement">
-      Contracts and business documents are written for lawyers, not for people running a business. One misunderstood clause can cost you time, money, or trust. DecoDocs translates complex documents into plain language so you know exactly what you're agreeing to.
-    </p>
+    <section class="hero" id="hero">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <span class="eyebrow">Modern document intelligence</span>
+          <h1>Snap Sign Pty Ltd builds AI to decode documents before you sign.</h1>
+          <p class="hero-lede">
+            DecoDocs turns dense PDFs into clear decisions with AI summaries, risk flags, and evidence-backed explanations.
+          </p>
+          <div class="hero-actions">
+            <a
+              href="https://decodocs.com/?entry_problem=company_home&utm_source=snapsign.com.au&utm_medium=landing&utm_campaign=cta"
+              class="button primary-cta"
+              aria-label="Analyze a document with DecoDocs"
+            >
+              Analyze a Document
+            </a>
+            <a class="button secondary" href="https://decodocs.com/view">View Demo</a>
+          </div>
+          <div class="hero-badges">
+            <span class="hero-badge">
+              <span class="badge-dot badge-dot-emerald"></span>
+              Free mode never stores files
+            </span>
+            <span class="hero-badge">
+              <span class="badge-dot"></span>
+              Pro includes vaults &amp; history
+            </span>
+          </div>
+          <p class="powered-by">Flagship product: <strong>DecoDocs</strong></p>
+        </div>
+        <div class="hero-media">
+          <img src="images/snap.webp" alt="DecoDocs preview" />
+        </div>
+      </div>
+    </section>
 
-    <div class="product-wrapper">
-      <a href="https://decodocs.com" class="product">
-        <img src="images/icon1.svg" width="90" height="90" alt="AI-Powered Proofreading Illustration" />
-        <h3>Understand</h3>
+    <section class="product-spotlight" id="features">
+      <div class="spotlight-content">
+        <h2>Product Spotlight: DecoDocs</h2>
         <p>
-          Plain-language explanations and quick summaries before you commit.
+          Upload a PDF to get plain-English explanations, risks, and what to check — before you sign. Free tier available.
         </p>
-        <ul class="feature-list">
-          <li>Know exactly what you're agreeing to</li>
-          <li>Share clear explanations with your team</li>
-          <li>Never miss a deadline or obligation</li>
-        </ul>
-      </a>
+        <h3>DecoDocs Capabilities</h3>
+        <div class="capability-grid">
+          <div class="capability-card">
+            <span class="capability-label">AI</span>
+            <h4>Plain-language summaries</h4>
+            <p>Every section is rewritten into clear, actionable language.</p>
+          </div>
+          <div class="capability-card">
+            <span class="capability-label">AI</span>
+            <h4>Risk and obligation flags</h4>
+            <p>Spot penalties, expiry traps, and one-sided clauses fast.</p>
+          </div>
+          <div class="capability-card">
+            <span class="capability-label">AI</span>
+            <h4>Side-by-side evidence</h4>
+            <p>See the original text next to the AI explanation.</p>
+          </div>
+          <div class="capability-card">
+            <span class="capability-label">AI</span>
+            <h4>Shareable decision reports</h4>
+            <p>Create a clean, board-ready summary in one click.</p>
+          </div>
+          <div class="capability-card">
+            <span class="capability-label">AI</span>
+            <h4>Structured highlights</h4>
+            <p>Tag sections as financial, legal, or operational.</p>
+          </div>
+          <div class="capability-card">
+            <span class="capability-label">AI</span>
+            <h4>Secure by design</h4>
+            <p>Free mode never stores files. Pro adds private vaults.</p>
+          </div>
+        </div>
+        <a
+          href="https://decodocs.com/?entry_problem=product_spotlight&utm_source=snapsign.com.au&utm_medium=landing&utm_campaign=spotlight"
+          class="button secondary"
+        >
+          Try DecoDocs
+        </a>
+        <p class="powered-by">A Snap Sign Pty Ltd product</p>
+      </div>
+      <div class="spotlight-media">
+        <img src="images/snap.webp" alt="See DecoDocs in action" />
+      </div>
+    </section>
 
-      <a href="https://decodocs.com" class="product">
-        <img src="images/icon2.svg" width="90" height="90" alt="Seamless Integration Illustration" />
-        <h3>Spot Risks</h3>
-        <p>
-          Catch risky clauses and unclear terms before they become expensive.
-        </p>
-        <ul class="feature-list">
-          <li>Avoid costly mistakes and unpleasant surprises</li>
-          <li>Negotiate from a stronger position</li>
-          <li>Protect yourself from one-sided terms</li>
-        </ul>
-      </a>
+    <section class="capabilities" id="how-it-works">
+      <h2>How it works</h2>
+      <div class="product-wrapper">
+        <div class="product">
+          <span class="step-label">Step 1</span>
+          <h3>Upload or open a PDF</h3>
+          <p>Drop in a contract, policy, or report. No setup required.</p>
+        </div>
 
-      <a href="https://decodocs.com" class="product">
-        <img src="images/icon3.svg" width="90" height="90" alt="Accessible and Free Illustration" />
-        <h3>Sign With Clarity</h3>
-        <p>
-          The best time to understand a document is before you sign it.
-        </p>
-        <ul class="feature-list">
-          <li>Make confident decisions, not rushed ones</li>
-          <li>Reduce disputes and misunderstandings</li>
-          <li>Build trust with clients and partners</li>
-        </ul>
-      </a>
-    </div>
+        <div class="product">
+          <span class="step-label">Step 2</span>
+          <h3>Decode with AI</h3>
+          <p>We translate the text, highlight obligations, and surface risks.</p>
+        </div>
 
-    <section class="use-cases">
+        <div class="product">
+          <span class="step-label">Step 3</span>
+          <h3>Act with clarity</h3>
+          <p>Export notes or send for signature only when you are ready.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="use-cases" id="use-cases">
       <h2>Use Cases</h2>
       <p>Explore the most common ways DecoDocs helps you make confident decisions.</p>
       <div class="use-case-grid">
-        <a class="use-case-card" href="/understand-contracts.html">
+        <a class="use-case-card" href="/understand-contracts/?entry_problem=understand_contracts&utm_source=snapsign.com.au&utm_medium=landing&utm_campaign=use_case">
+          <img class="use-case-icon" src="images/usecase-understand.svg" width="40" height="40" alt="" aria-hidden="true" />
           <h3>Understand contracts</h3>
           <p>Decode the clauses before you commit to anything risky.</p>
         </a>
-        <a class="use-case-card" href="/explain-documents.html">
+        <a class="use-case-card" href="/explain-documents/?entry_problem=explain_documents&utm_source=snapsign.com.au&utm_medium=landing&utm_campaign=use_case">
+          <img class="use-case-icon" src="images/usecase-explain.svg" width="40" height="40" alt="" aria-hidden="true" />
           <h3>Explain documents</h3>
           <p>Turn complex language into plain English you can act on.</p>
         </a>
-        <a class="use-case-card" href="/find-risky-clauses.html">
+        <a class="use-case-card" href="/find-risky-clauses/?entry_problem=find_risky_clauses&utm_source=snapsign.com.au&utm_medium=landing&utm_campaign=use_case">
+          <img class="use-case-icon" src="images/usecase-risk.svg" width="40" height="40" alt="" aria-hidden="true" />
           <h3>Find risky clauses</h3>
           <p>Spot hidden obligations, penalties, and one-sided terms.</p>
         </a>
-        <a class="use-case-card" href="/share-and-sign.html">
+        <a class="use-case-card" href="/share-and-sign/?entry_problem=share_and_sign&utm_source=snapsign.com.au&utm_medium=landing&utm_campaign=use_case">
+          <img class="use-case-icon" src="images/usecase-share.svg" width="40" height="40" alt="" aria-hidden="true" />
           <h3>Share and sign</h3>
           <p>Send documents with clarity before collecting signatures.</p>
         </a>
-        <a class="use-case-card" href="/manage-documents.html">
+        <a class="use-case-card" href="/manage-documents/?entry_problem=manage_documents&utm_source=snapsign.com.au&utm_medium=landing&utm_campaign=use_case">
+          <img class="use-case-icon" src="images/usecase-manage.svg" width="40" height="40" alt="" aria-hidden="true" />
           <h3>Manage documents</h3>
           <p>Organize everything in one place with context attached.</p>
+        </a>
+        <a class="use-case-card" href="/translate-documents/?entry_problem=translate_documents&utm_source=snapsign.com.au&utm_medium=landing&utm_campaign=use_case">
+          <img class="use-case-icon" src="images/usecase-translate.svg" width="40" height="40" alt="" aria-hidden="true" />
+          <h3>Translate documents</h3>
+          <p>Remove language barriers with instant translations.</p>
         </a>
       </div>
     </section>
 
-    <div class="decodocs-intro">
-      <img src="images/DecoDocsLogo.svg" width="90" height="90" alt="DecoDocs Logo" />
-      <h2>Meet DecoDocs</h2>
+    <section class="trust-safety">
+      <h2>Trust &amp; Safety</h2>
+      <ul>
+        <li>Free mode never stores files. Pro adds private vaults.</li>
+        <li>Server-side only AI processing and access control.</li>
+        <li>Short-lived upload/download links, no long-lived public URLs.</li>
+        <li>No secrets or API keys in the browser.</li>
+      </ul>
+    </section>
+
+    <section class="leadership">
+      <h2>Leadership</h2>
+      <div class="leader-card">
+        <img
+          class="leader-photo"
+          src="images/irina-vasilkova.webp"
+          width="180"
+          height="220"
+          alt="Iryna Vasylkova"
+          loading="lazy"
+        />
+        <div class="leader-content">
+          <h3>Iryna Vasylkova</h3>
+          <p class="leader-title">Founder &amp; CEO</p>
+          <p>
+            Iryna Vasylkova leads Snap Sign Pty Ltd with a focus on making secure, understandable document workflows
+            accessible for freelancers and small businesses. With a background in language services and cross‑cultural
+            collaboration, she brings a clarity‑first mindset to building AI products that help teams act with confidence.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="roadmap" id="roadmap">
+      <h2>Product Roadmap</h2>
+      <div class="roadmap-quarter">
+        <h3>Q3 2026: User Management & Mobile Integration</h3>
+        <ul>
+          <li><strong>User Authentication:</strong> Secure login and registration system</li>
+          <li><strong>User Profiles:</strong> Personalized settings and preferences</li>
+          <li><strong>Document History:</strong> Access to previously analyzed documents</li>
+          <li><strong>Dashboard:</strong> Central hub for all user activities</li>
+          <li><strong>Mobile Integration:</strong> Mobile app and responsive design improvements</li>
+          <li><strong>Offline Access:</strong> View and manage documents without internet</li>
+        </ul>
+      </div>
+      <div class="roadmap-quarter">
+        <h3>Q4 2026: Advanced AI Insights & Analysis</h3>
+        <ul>
+          <li><strong>OCR Integration:</strong> Support for scanned documents and images</li>
+          <li><strong>Multi-language Support:</strong> Analysis in multiple languages</li>
+          <li><strong>Industry-Specific Templates:</strong> Tailored analysis for different document types</li>
+          <li><strong>Advanced NLP:</strong> More sophisticated natural language processing</li>
+          <li><strong>Risk Summaries:</strong> Deeper risk analysis and predictive suggestions</li>
+          <li><strong>Tool Integrations:</strong> Enhanced integrations with Google Docs, Microsoft Office, etc.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="cta">
+      <h2>Join the DecoDocs Early Access</h2>
+      <a href="https://eepurl.com/i165U-" class="button">Get Early Access</a>
       <p>
-        DecoDocs is our document understanding app: decode what you're about to sign, surface risks and obligations,
-        then act with confidence.
+        Be the first to try new decoding features for freelancers and small businesses. We'll only email product updates
+        and access invites.
       </p>
-      <p class="decodocs-link">
-        Try it now at <a href="https://decodocs.com">decodocs.com</a>.
-      </p>
-      <a href="https://decodocs.com" class="button">Open DecoDocs</a>
-    </div>
-
-
-    <p class="h-card">
-      Our team of experts is passionate about digital signature solutions and believes in the power of collaboration.
-      <br /><br />
-      We are committed to providing top-notch digital signature solutions and look forward to collaborating with
-      partners who share our vision.
-      <br /><br />
-
-      For collaboration opportunities, please contact our CEO, <span class="p-name">Iryna Vasylkova</span>, at
-      <a href="mailto:iryna@snapsign.com.au" class="u-email">iryna@snapsign.com.au</a>.
-      All collaboration requests must follow the procedure of signing a Non-Disclosure Agreement (NDA) first.
-      <br /><br />
-      Thank you for your interest and enthusiasm. We’re excited to see where this new journey takes us all.
-    </p>
-    <div class="cta">
-      <h2>Join Snap Sign's Early Adopters & Get Premium for Life!</h2>
-      <a href="https://eepurl.com/i165U-" class="button">Subscribe</a>
-      <p>
-        Sign up now to become a tester for Snap Sign, our innovative electronic signature tool. As an early supporter,
-        you’ll enjoy our Premium Plan forever, completely free!
-      </p>
-    </div>
+    </section>
 
   </div>
-  <script is:inline>
-    if (location.hostname.indexOf("snapsign.com.au") === -1) {
-      location.replace("https://snapsign.com.au");
-    }
-  </script>
 </BaseLayout>

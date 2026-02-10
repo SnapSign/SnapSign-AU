@@ -5,7 +5,7 @@ import SiteHeader from "../components/SiteHeader.astro";
 const title = "Understand Your Contract Before You Sign | DecoDocs";
 const description =
   "DecoDocs explains contracts in plain language, highlights risks, and helps you act with confidence -- before it's too late.";
-const canonical = "https://snapsign.com.au/understand-contracts.html";
+const canonical = "https://snapsign.com.au/understand-contracts/";
 const twitterDescription =
   "DecoDocs explains contracts in plain language, highlights risks, and helps you act with confidence.";
 ---
@@ -17,16 +17,15 @@ const twitterDescription =
   twitterDescription={twitterDescription}
 >
   <div class="container">
-    <SiteHeader
-      logoSrc="images/DecoDocsLogo.svg"
-      logoAlt="DecoDocs Logo"
-      ariaLabel="Snap Sign home"
-    />
+    <SiteHeader />
 
-    <h1>Understand your contract before you sign it</h1>
-    <h2>DecoDocs explains contracts in plain language, highlights risks, and helps you act with confidence -- before it's too late</h2>
+    <section class="page-hero">
+      <span class="eyebrow">DecoDocs use case</span>
+      <h1>Understand your contract before you sign it</h1>
+      <h2>DecoDocs explains contracts in plain language, highlights risks, and helps you act with confidence -- before it's too late</h2>
 
-    <a href="https://decodocs.com" class="button">Upload a Contract to Decode</a>
+      <a href="https://decodocs.com" class="button">Upload a Contract to Decode</a>
+    </section>
 
     <div class="problem-section">
       <h3>The Problem</h3>

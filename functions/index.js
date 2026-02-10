@@ -1086,9 +1086,9 @@ exports.analyzeByType = functions.https.onCall(async (data, context) => {
   };
 });
 
-exports.cleanupOldUsageRecords = functions.pubsub.schedule('every 24 hours from 01:00 to 02:00')
-  .timeZone('Australia/Sydney')
-  .onRun(async (context) => {
+exports.cleanupOldUsageRecords = functions.scheduler.onSchedule('every day 01:00', {
+  timeZone: 'Australia/Sydney'
+}, async (context) => {
     try {
       // Delete usage records older than configured TTL days
       const cutoffDate = new Date();

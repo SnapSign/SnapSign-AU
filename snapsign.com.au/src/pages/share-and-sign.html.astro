@@ -1,0 +1,70 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+
+const title = "Share and Sign Documents with Confidence | DecoDocs";
+const description =
+  "DecoDocs lets you understand documents first -- then share and sign them knowing exactly what you're agreeing to.";
+const canonical = "https://snapsign.com.au/share-and-sign.html";
+const twitterDescription =
+  "Understand documents first, then share and sign knowing exactly what you're agreeing to.";
+---
+<BaseLayout
+  title={title}
+  description={description}
+  canonical={canonical}
+  ogUrl={canonical}
+  twitterDescription={twitterDescription}
+>
+  <div class="container">
+    <SiteHeader
+      logoSrc="images/DecoDocsLogo.svg"
+      logoAlt="DecoDocs Logo"
+      ariaLabel="Snap Sign home"
+    />
+
+    <h1>Share and sign documents with confidence</h1>
+    <h2>DecoDocs lets you understand documents first -- then share and sign them knowing exactly what you're agreeing to</h2>
+
+    <a href="https://decodocs.com" class="button">Upload a Document to Get Started</a>
+
+    <div class="problem-section">
+      <h3>The Problem</h3>
+      <p>
+        Sending documents to clients without full clarity leads to misunderstandings, endless questions, and disputes later. Signing blindly is worse.
+      </p>
+    </div>
+
+    <div class="benefits-section">
+      <h3>What You Get</h3>
+      <ul>
+        <li><strong>Fewer back-and-forth questions</strong> when everyone understands</li>
+        <li><strong>Faster agreements</strong> without confusion</li>
+        <li><strong>Clear record</strong> of what was shared and signed</li>
+      </ul>
+    </div>
+
+    <div class="how-section">
+      <h3>How DecoDocs Helps</h3>
+      <ul>
+        <li>Keep explanations attached to documents</li>
+        <li>Share documents with context</li>
+        <li>Send for signature after understanding</li>
+        <li>Track status and history</li>
+      </ul>
+      <p><strong>Understanding comes first. Action comes next.</strong></p>
+    </div>
+
+    <div class="how-it-works">
+      <h3>How It Works</h3>
+      <ol>
+        <li>Upload and decode a document</li>
+        <li>Share it with a client</li>
+        <li>Send for signature when ready</li>
+      </ol>
+    </div>
+
+    <a href="https://decodocs.com" class="button">Upload a Document and Share It</a>
+
+  </div>
+</BaseLayout>

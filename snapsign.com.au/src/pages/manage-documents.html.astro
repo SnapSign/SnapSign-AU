@@ -1,0 +1,69 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+
+const title = "Manage All Your Business Documents in One Place | DecoDocs";
+const description =
+  "DecoDocs helps freelancers and small businesses store, organize, and reuse documents -- with understanding built in.";
+const canonical = "https://snapsign.com.au/manage-documents.html";
+const twitterDescription = "Store, organize, and reuse documents with understanding built in.";
+---
+<BaseLayout
+  title={title}
+  description={description}
+  canonical={canonical}
+  ogUrl={canonical}
+  twitterDescription={twitterDescription}
+>
+  <div class="container">
+    <SiteHeader
+      logoSrc="images/DecoDocsLogo.svg"
+      logoAlt="DecoDocs Logo"
+      ariaLabel="Snap Sign home"
+    />
+
+    <h1>Manage all your business documents in one place</h1>
+    <h2>DecoDocs helps freelancers and small businesses store, organize, and reuse documents -- with understanding built in</h2>
+
+    <a href="https://decodocs.com" class="button">Start Your Document Workspace</a>
+
+    <div class="problem-section">
+      <h3>The Problem</h3>
+      <p>
+        Documents are scattered across email, folders, drives, and messaging apps. Context gets lost. Mistakes repeat.
+      </p>
+    </div>
+
+    <div class="benefits-section">
+      <h3>What You Get</h3>
+      <ul>
+        <li><strong>Less chaos</strong> when everything is in one place</li>
+        <li><strong>Faster decisions</strong> with context at your fingertips</li>
+        <li><strong>Confidence</strong> when reusing documents</li>
+      </ul>
+    </div>
+
+    <div class="how-section">
+      <h3>How DecoDocs Helps</h3>
+      <ul>
+        <li>Store documents securely</li>
+        <li>Keep explanations and notes attached</li>
+        <li>Search by meaning, not just filename</li>
+        <li>Set reminders for deadlines and payments</li>
+      </ul>
+      <p><strong>Your documents finally make sense over time.</strong></p>
+    </div>
+
+    <div class="how-it-works">
+      <h3>How It Works</h3>
+      <ol>
+        <li>Upload documents</li>
+        <li>Decode and annotate</li>
+        <li>Find and reuse them anytime</li>
+      </ol>
+    </div>
+
+    <a href="https://decodocs.com" class="button">Start Managing Documents Now</a>
+
+  </div>
+</BaseLayout>

@@ -1,0 +1,162 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+
+const title = "Snap Sign Pty Ltd | Digital Signature Solutions";
+const description =
+  "Snap Sign Pty Ltd offers user-friendly, secure, and cost-effective digital signature solutions. Empowering businesses and individuals to go paperless with our AI-powered DecoDocs platform.";
+const ogDescription =
+  "Snap Sign Pty Ltd offers user-friendly, secure, and FREE digital signature solutions. Empowering businesses and individuals to go paperless with our AI-powered DecoDocs platform.";
+const canonical = "https://snapsign.com.au/";
+---
+<BaseLayout
+  title={title}
+  description={description}
+  canonical={canonical}
+  ogDescription={ogDescription}
+  ogUrl={canonical}
+  ogSiteName="Snap Sign Pty Ltd"
+>
+  <Fragment slot="head">
+    <script is:inline>
+      (function () {
+        var canonicalHost = "snapsign.com.au";
+        var host = location.host;
+        var isFirebase = host.endsWith(".web.app") || host.endsWith(".firebaseapp.com");
+        if (isFirebase && host !== canonicalHost) {
+          location.replace(
+            "https://" + canonicalHost + location.pathname + location.search + location.hash
+          );
+        }
+      })();
+    </script>
+  </Fragment>
+
+  <div class="container">
+    <SiteHeader
+      logoSrc="images/SnapSignLogo.svg"
+      logoAlt="Snap Sign Logo"
+      ariaLabel="Snap Sign home"
+    />
+
+    <h1>
+      Understand Your Documents Before You Sign
+    </h1>
+    <h2>
+      DecoDocs explains contracts in plain English, highlights risks, and helps you sign with confidence
+    </h2>
+    <p class="problem-statement">
+      Contracts and business documents are written for lawyers, not for people running a business. One misunderstood clause can cost you time, money, or trust. DecoDocs translates complex documents into plain language so you know exactly what you're agreeing to.
+    </p>
+
+    <div class="product-wrapper">
+      <a href="https://decodocs.com" class="product">
+        <img src="images/icon1.svg" width="90" height="90" alt="AI-Powered Proofreading Illustration" />
+        <h3>Understand</h3>
+        <p>
+          Plain-language explanations and quick summaries before you commit.
+        </p>
+        <ul class="feature-list">
+          <li>Know exactly what you're agreeing to</li>
+          <li>Share clear explanations with your team</li>
+          <li>Never miss a deadline or obligation</li>
+        </ul>
+      </a>
+
+      <a href="https://decodocs.com" class="product">
+        <img src="images/icon2.svg" width="90" height="90" alt="Seamless Integration Illustration" />
+        <h3>Spot Risks</h3>
+        <p>
+          Catch risky clauses and unclear terms before they become expensive.
+        </p>
+        <ul class="feature-list">
+          <li>Avoid costly mistakes and unpleasant surprises</li>
+          <li>Negotiate from a stronger position</li>
+          <li>Protect yourself from one-sided terms</li>
+        </ul>
+      </a>
+
+      <a href="https://decodocs.com" class="product">
+        <img src="images/icon3.svg" width="90" height="90" alt="Accessible and Free Illustration" />
+        <h3>Sign With Clarity</h3>
+        <p>
+          The best time to understand a document is before you sign it.
+        </p>
+        <ul class="feature-list">
+          <li>Make confident decisions, not rushed ones</li>
+          <li>Reduce disputes and misunderstandings</li>
+          <li>Build trust with clients and partners</li>
+        </ul>
+      </a>
+    </div>
+
+    <section class="use-cases">
+      <h2>Use Cases</h2>
+      <p>Explore the most common ways DecoDocs helps you make confident decisions.</p>
+      <div class="use-case-grid">
+        <a class="use-case-card" href="/understand-contracts.html">
+          <h3>Understand contracts</h3>
+          <p>Decode the clauses before you commit to anything risky.</p>
+        </a>
+        <a class="use-case-card" href="/explain-documents.html">
+          <h3>Explain documents</h3>
+          <p>Turn complex language into plain English you can act on.</p>
+        </a>
+        <a class="use-case-card" href="/find-risky-clauses.html">
+          <h3>Find risky clauses</h3>
+          <p>Spot hidden obligations, penalties, and one-sided terms.</p>
+        </a>
+        <a class="use-case-card" href="/share-and-sign.html">
+          <h3>Share and sign</h3>
+          <p>Send documents with clarity before collecting signatures.</p>
+        </a>
+        <a class="use-case-card" href="/manage-documents.html">
+          <h3>Manage documents</h3>
+          <p>Organize everything in one place with context attached.</p>
+        </a>
+      </div>
+    </section>
+
+    <div class="decodocs-intro">
+      <img src="images/DecoDocsLogo.svg" width="90" height="90" alt="DecoDocs Logo" />
+      <h2>Meet DecoDocs</h2>
+      <p>
+        DecoDocs is our document understanding app: decode what you're about to sign, surface risks and obligations,
+        then act with confidence.
+      </p>
+      <p class="decodocs-link">
+        Try it now at <a href="https://decodocs.com">decodocs.com</a>.
+      </p>
+      <a href="https://decodocs.com" class="button">Open DecoDocs</a>
+    </div>
+
+
+    <p class="h-card">
+      Our team of experts is passionate about digital signature solutions and believes in the power of collaboration.
+      <br /><br />
+      We are committed to providing top-notch digital signature solutions and look forward to collaborating with
+      partners who share our vision.
+      <br /><br />
+
+      For collaboration opportunities, please contact our CEO, <span class="p-name">Iryna Vasylkova</span>, at
+      <a href="mailto:iryna@snapsign.com.au" class="u-email">iryna@snapsign.com.au</a>.
+      All collaboration requests must follow the procedure of signing a Non-Disclosure Agreement (NDA) first.
+      <br /><br />
+      Thank you for your interest and enthusiasm. We’re excited to see where this new journey takes us all.
+    </p>
+    <div class="cta">
+      <h2>Join Snap Sign's Early Adopters & Get Premium for Life!</h2>
+      <a href="https://eepurl.com/i165U-" class="button">Subscribe</a>
+      <p>
+        Sign up now to become a tester for Snap Sign, our innovative electronic signature tool. As an early supporter,
+        you’ll enjoy our Premium Plan forever, completely free!
+      </p>
+    </div>
+
+  </div>
+  <script is:inline>
+    if (location.hostname.indexOf("snapsign.com.au") === -1) {
+      location.replace("https://snapsign.com.au");
+    }
+  </script>
+</BaseLayout>

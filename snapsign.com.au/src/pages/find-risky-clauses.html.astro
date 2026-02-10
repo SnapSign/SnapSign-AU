@@ -1,0 +1,69 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+
+const title = "Find Risky Clauses Before They Cause Trouble | DecoDocs";
+const description =
+  "DecoDocs scans your documents to highlight risks, obligations, and one-sided terms freelancers often miss.";
+const canonical = "https://snapsign.com.au/find-risky-clauses.html";
+const twitterDescription =
+  "DecoDocs scans your documents to highlight risks, obligations, and one-sided terms.";
+---
+<BaseLayout
+  title={title}
+  description={description}
+  canonical={canonical}
+  ogUrl={canonical}
+  twitterDescription={twitterDescription}
+>
+  <div class="container">
+    <SiteHeader
+      logoSrc="images/DecoDocsLogo.svg"
+      logoAlt="DecoDocs Logo"
+      ariaLabel="Snap Sign home"
+    />
+
+    <h1>Find risky clauses before they cause trouble</h1>
+    <h2>DecoDocs scans your documents to highlight risks, obligations, and one-sided terms freelancers often miss</h2>
+
+    <a href="https://decodocs.com" class="button">Upload a Document to Check Risks</a>
+
+    <div class="problem-section">
+      <h3>The Problem</h3>
+      <p>
+        Many problems are hidden in small print, vague wording, and one-sided clauses. You don't notice them until something goes wrong.
+      </p>
+    </div>
+
+    <div class="benefits-section">
+      <h3>What You Get</h3>
+      <ul>
+        <li><strong>Clear warnings</strong> with explanations</li>
+        <li><strong>Better negotiation position</strong> when you know what to push back on</li>
+        <li><strong>Fewer unpleasant surprises</strong> down the road</li>
+      </ul>
+    </div>
+
+    <div class="how-section">
+      <h3>How DecoDocs Helps</h3>
+      <ul>
+        <li>Highlights risky or unusual clauses</li>
+        <li>Explains why they matter</li>
+        <li>Flags deadlines, penalties, and obligations</li>
+      </ul>
+      <p><strong>You see the risks <em>before</em> you commit.</strong></p>
+    </div>
+
+    <div class="how-it-works">
+      <h3>How It Works</h3>
+      <ol>
+        <li>Upload your document</li>
+        <li>DecoDocs highlights risks</li>
+        <li>You decide what to change or accept</li>
+      </ol>
+    </div>
+
+    <a href="https://decodocs.com" class="button">Upload a Document and Find Risks</a>
+
+  </div>
+</BaseLayout>

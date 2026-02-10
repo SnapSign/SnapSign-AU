@@ -5,7 +5,7 @@
   "hosting": [
     {
       "site": "snapsign-au",
-      "public": "snapsign.com.au",
+      "public": "snapsign.com.au/dist",
       "ignore": [
         "firebase.json",
         "**/.*",
@@ -20,7 +20,7 @@
     },
     {
       "site": "decodocs-site",
-      "public": "decodocs/web/decodocs.com",
+      "public": "Decodocs/web/decodocs.com",
       "ignore": [
         "firebase.json",
         "**/.*",
@@ -42,7 +42,7 @@
     },
     {
       "site": "decodocs-admin",
-      "public": "decodocs/admin/dist",
+      "public": "Decodocs/admin/dist",
       "ignore": [
         "firebase.json",
         "**/.*",

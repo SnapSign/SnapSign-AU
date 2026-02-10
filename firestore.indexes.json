@@ -13,16 +13,6 @@
           "order": "DESCENDING"
         }
       ]
-    },
-    {
-      "collectionGroup": "usage_docs",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "lastUsedAt",
-          "order": "ASCENDING"
-        }
-      ]
     }
   ],
   "fieldOverrides": []

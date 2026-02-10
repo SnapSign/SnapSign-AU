@@ -11,7 +11,7 @@
     "test:unit": "mocha test/functions.test.js --timeout 10000"
   },
   "engines": {
-    "node": "18"
+    "node": "22"
   },
   "dependencies": {
     "crypto-js": "^4.2.0",

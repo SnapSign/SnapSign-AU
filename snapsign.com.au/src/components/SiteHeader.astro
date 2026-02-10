@@ -1,0 +1,8 @@
+---
+const { logoSrc, logoAlt, href = "/", ariaLabel = "Home" } = Astro.props;
+---
+<header class="site-header">
+  <a class="logo-link" href={href} aria-label={ariaLabel}>
+    <img class="logo" src={logoSrc} width="90" height="90" alt={logoAlt} />
+  </a>
+</header>

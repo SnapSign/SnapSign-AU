@@ -2,20 +2,20 @@
 
 ## Repo structure (important)
 - This repository is the **Firebase deployment/hosting umbrella** for the `snapsign-au` Firebase project (hosting + functions + rules).
-- `decodocs/` is a **nested, independent git repository** (it contains its own `.git/`).
-- DecoDocs must remain physically nested under this repo so Firebase Hosting can deploy from:
-  - `decodocs/web/dist`
+- `Decodocs/` is a **nested, independent git repository** (it contains its own `.git/`).
+- DecoDocs must remain physically nested under this repo so Firebase Hosting can deploy static outputs from `Decodocs/web/decodocs.com/` and `Decodocs/admin/dist/`.
+- Note: `firebase.json` currently uses lowercase `decodocs/...` paths; the actual folder in this repo is `Decodocs/` (capital D).
 
 **Rule:** Do not vendor/copy DecoDocs into SnapSign-AU history. Keep it as its own repo.
 
-## Hosting targets → production domains
-Firebase Hosting targets in `firebase.json` map to production domains as follows:
+## Hosting targets (per firebase.json)
+Firebase Hosting targets in `firebase.json` and their public directories are:
 
-1) `site: "snapsign-au"` → **snapsign.com.au**
-   - static/SPA hosting served from `public/`
+1) `site: "snapsign-au"` → `snapsign.com.au/` (intended domain: **snapsign.com.au**)
 
-2) `site: "decodocs-site"` → **decodocs.com**
-   - DecoDocs app hosting served from `decodocs/web/dist`
+2) `site: "decodocs-site"` → `Decodocs/web/decodocs.com/` (intended domain: **decodocs.com**)
+
+3) `site: "decodocs-admin"` → `Decodocs/admin/dist/` (domain not defined in repo; check Firebase Console)
 
 ## Hosting/Functions Requirements
 - **Use only simple (static or SPA) Firebase Hosting and basic gen2 Functions for all subprojects.**

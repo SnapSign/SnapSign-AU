@@ -1,99 +1,40 @@
 ## Known issues and technical debt
 
-### IMPLEMENTATION STATUS (as of Jan 28, 2026)
+### IMPLEMENTATION STATUS (as of Feb 10, 2026)
 
-✅ **Issue #1 - Anonymous auth failure**: IMPLEMENTED
-✅ **Issue #2 - Sensitive setup information**: IMPLEMENTED  
-✅ **Issue #3 - Test coverage**: PARTIALLY IMPLEMENTED (unit tests added)
-✅ **Issue #4 - Submodule checkout**: VERIFIED (decodocs-repo is available)
 
 ---
 
-### 1. Anonymous auth failure on decoadocs view route
+### 1. Fix the bugs on decodocs.com home page
+  - Buttons are not consistent: corner radius is different for different buttons, also slightly different hight
+  - Price hould not be on home page - there is a dedicated page for that
+  - Need to have a clear CTA on home page - what should user do?
+  - Need to have a clear value proposition on home page - what should user do?
+  - Need to have integration section, it should have a similar design to the one yo ucan find on the home page of eesel.ai
+  - Use cases needs also to be nicer and again check eesel.ai for the inspiration
+  - Let's have "Secure by design" section same like eesel intead of that useless and weak FAQ section.
 
-- **Symptom**: When visiting the decoadocs “view” route, anonymous Firebase auth may fail and block the entire page from loading. The page should still allow PDF documents to render and instead surface a user‑friendly error popup rather than crashing or leaving the screen blank.
-- **Impact**: Users cannot view documents when anonymous auth fails (for example, due to misconfiguration, network problems, or quota limits). This is especially problematic for unauthenticated / one‑time view links where we cannot rely on a traditional login flow.
-- **Likely root causes (hypotheses)**:
-  - `signInAnonymously` (or equivalent) is awaited as a **hard prerequisite** for rendering the document view, with any thrown error bubbling all the way up and preventing the React (or other UI) tree from mounting.
-  - Error handling around auth initialization is not defensive: missing `try/catch` or error boundary, or the catch handler itself throws.
-  - Routing logic assumes a valid authenticated user object and does not guard against `null` / `undefined` when auth fails, leading to runtime exceptions.
-- **Desired behaviour**:
-  - Attempt anonymous auth on page load.
-  - If auth succeeds, continue as normal.
-  - If auth fails:
-    - Still render the PDF/document viewer UI as far as technically possible.
-    - Show a non‑blocking, user‑friendly popup (modal / toast / banner) describing that some features may be limited due to auth issues.
-    - Log the error to the console and to any error‑tracking system, but **do not** crash the page.
-- **Proposed fix (high level)**:
-  - Wrap anonymous auth initialization in a `try/catch` block and treat failure as a **soft error**:
-    - Store auth state in something like `{ status: "ok" | "error", user: User | null, error?: Error }`.
-    - In the view route component, render the document viewer unconditionally, and conditionally render an error popup if `status === "error"`.
-  - Ensure any route guards or hooks that rely on `currentUser` can handle the “anonymous auth failed” state gracefully (e.g., allow read‑only access, or fall back to a public token / signed URL mechanism if that’s how PDFs are fetched).
-  - Add an error boundary around the decoadocs view route so that any unexpected runtime failure is caught and shown as a friendly message instead of a blank screen.
-  - Add tests (see below) to lock in the behaviour.
+#### 2. Redesing the /view page
+  - Let's make its UI/UX to follow patterns of smallpdf.com (see  in Decodocs/docs/screenshots/smallpdf-view-page.png)
 
-> Note: The actual implementation details need to be applied in the `decodocs-repo` application code (submodule), which is not currently checked out inside this worktree. The steps above should be implemented there once the submodule is available.
-
-### 2. Secret Management Policy (No Environment Variables)
-
-- **Symptom**: Historical documentation suggested using `.env` files or environment variables, which contradicts the project's architectural standard.
-- **Impact**: Inconsistent secret management and potential security risks from misconfigured environment files.
-- **Desired state**:
-  - **Zero reliance on `.env` files.**
-  - **Firebase Native Configuration** used for deployment settings.
-  - **Firestore** used for secure, runtime secret storage (API keys, etc.).
-  - **SETUP_INSTRUCTIONS.md** strictly notes that environment variables are not used.
-- **Resolution**:
-  - Removed all `.env` and `.env.example` files.
-  - Updated `SETUP_INSTRUCTIONS.md` with a strict note on the Firestore-based workflow.
-  - Verified that application code (in `decodocs/`) fetches secrets from Firestore or native Firebase config.
-
----
-
-### 3. Test coverage for core functionality (unit/integration and E2E)
+### 3. PDF edit and sign fix
+  - Follow the UI/UX of smallpdf.com (see  in Decodocs/docs/screenshots/smallpdf-sign1.png and Decodocs/docs/screenshots/smallpdf-sign2.png )
 
 
-- **Symptom**: In this `upy` worktree there is no visible application source code, `package.json`, or test suite. The actual application is expected to live in the `decodocs-repo` submodule, which is not currently checked out.
-- **Impact**:
-  - Unable to verify behaviour like anonymous auth handling, PDF rendering, and error popups automatically.
-  - Risk of regressions when changing auth, routing, or viewer code.
-- **Desired state**:
-  - **Unit / integration tests** for:
-    - Anonymous auth initialisation (success & failure paths).
-    - DecoAdocs view route rendering when:
-      - Auth succeeds.
-      - Auth fails but PDF still renders and an error popup is shown.
-    - Any services / hooks that wrap Firebase and routing logic.
-  - **E2E tests** (e.g., Playwright / Cypress) for:
-    - Opening a view link and successfully seeing the document.
-    - Simulating anonymous auth failure (e.g., by mocking Firebase or using a test environment) and confirming:
-      - The page does **not** crash.
-      - The document is visible.
-      - A clear error message is presented to the user.
-  - Tests should run in CI as part of PR validation.
-- **Proposed fix (high level)**:
-  - In `decodocs-repo`:
-    - Ensure a test runner is configured (Jest/Vitest) for unit/integration tests.
-    - Add scenario‑based tests around the decoadocs view route and its auth handling.
-    - Configure an E2E runner (Playwright/Cypress) against a local dev server or Firebase emulator suite.
-    - Wire tests into GitHub Actions (or existing CI) so they run on push/PR.
+### 4. Update documentation to reflect current project state
+(Pending)
 
-### 4. Submodule (`decodocs-repo`) not available in this worktree
+### 6. 🤖 MCP Integration (High Feature Value)
+Task: detailed in TODO.md as "Make DecoDocs available via MCP".
+Why: Allows AI agents (like Cursor/Claude) to use DecoDocs to analyze local files. This is a forward-looking feature.
 
-- **Symptom**: `.gitmodules` declares a `decodocs-repo` submodule, but the directory is not present in this worktree. That repo likely contains the main application code, routes, and tests.
-- **Impact**:
-  - From this `upy` worktree alone, it is not possible to inspect or modify the decoadocs view route implementation, auth logic, or test suite.
-- **Proposed next steps**:
-  - Initialize and update the `decodocs-repo` submodule in a workspace where edits are allowed (or open that repository directly in Cursor).
-  - Apply the fixes described in sections 1–3 within that repo.
-  - Keep this `Issues.md` file updated with the current status of each item (e.g., “Implemented and tested in `decodocs-repo` commit XYZ”).
+### 7. 🔐 Auth & Account Features
+Task: Implement Account Linking (Anonymous → Email/Google) or add Microsoft/Apple Sign-in.
+Why: Improves user retention, but might require API keys/credentials I don't have access to.
 
 ---
 
 ## Summary / action items
 
-1. **Fix anonymous auth handling in the decoadocs view route** so that auth failure is treated as a soft error and the document viewer still renders, with a friendly popup instead of a crash.
-2. **Enforce the strict "No .env" policy** by using Firestore for runtime secrets and Firebase native config for deployment, and update all docs to reflect this.
-3. **Establish and enforce automated tests (unit/integration + E2E)** around auth, routing, and PDF rendering, especially the failure‑mode where anonymous auth cannot be obtained.
-4. **Check out and work in the `decodocs-repo` submodule** (or its standalone clone) to implement these changes in the actual application code.
-
+1.  **Update documentation** to reflect the latest changes (Refactoring, Tests).
+2.  **Proceed with MCP Integration** or **Auth Features** as next priority.

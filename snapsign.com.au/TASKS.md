@@ -136,10 +136,3 @@ Product Roadmap: Upcoming features for DecoDocs - Q3: Mobile Integration, Q4: Ad
 **How (files + steps)**
 1. Add UTM and entry_problem to links to decodocs.com.
 
----
-
-## Task 10 — Optional: lightweight pricing link
-**Why**: Link to pricing without claims.
-
-**How (files + steps)**
-1. Add "See pricing" link near CTA, pointing to decodocs.com/pricing.

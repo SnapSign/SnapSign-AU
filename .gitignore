@@ -81,6 +81,9 @@ build/
 # OS files
 .DS_Store
 
+# Stripe test config (contains test-mode secret key)
+functions/test/.stripe-test-config.json
+
 # Nested DecoDocs repo (intentionally separate git repo)
 decodocs/
 

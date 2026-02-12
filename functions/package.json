@@ -9,8 +9,9 @@
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "test": "mocha test/**/*.test.js --timeout 10000",
-    "test:unit": "mocha test/functions.test.js --timeout 10000"
+    "test": "mocha test/**/*.test.js --timeout 30000",
+    "test:unit": "mocha test/functions.test.js --timeout 10000",
+    "test:stripe": "mocha test/stripe.test.js --timeout 30000"
   },
   "engines": {
     "node": "22"

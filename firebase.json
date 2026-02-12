@@ -26,13 +26,6 @@
         "**/.*",
         "**/node_modules/**"
       ],
-      "redirects": [
-        {
-          "source": "**",
-          "destination": "https://decodocs.com/:splat",
-          "type": 301
-        }
-      ],
       "rewrites": [
         {
           "source": "**",

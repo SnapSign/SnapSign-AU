@@ -1,7 +1,7 @@
-// firebase-functions v7: main export is v2 namespace (different onCall signature).
-// Our callable functions use v1 (data, context) pattern, so import v1 explicitly.
-const functions = require('firebase-functions/v1');
-const { scheduler } = require('firebase-functions/v2');
+// firebase-functions v7: use v2 API (gen2 Cloud Functions).
+// onCall handlers receive a single request object; we destructure as ({ data, ...context })
+// so helpers that access context.auth keep working unchanged.
+const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const fs = require('fs');
 const path = require('path');
@@ -221,7 +221,7 @@ const validateOutputSchema = (result) => {
 };
 
 // Preflight check function
-exports.preflightCheck = functions.https.onCall(async (data, context) => {
+exports.preflightCheck = functions.https.onCall(async ({ data, ...context }) => {
   try {
     const uid = validateAuth(context);
     
@@ -308,7 +308,7 @@ exports.preflightCheck = functions.https.onCall(async (data, context) => {
 });
 
 // Analyze text function
-exports.analyzeText = functions.https.onCall(async (data, context) => {
+exports.analyzeText = functions.https.onCall(async ({ data, ...context }) => {
   try {
     const entitlement = await getUserEntitlement(context);
 
@@ -473,7 +473,7 @@ exports.analyzeText = functions.https.onCall(async (data, context) => {
 });
 
 // Get entitlement function
-exports.getEntitlement = functions.https.onCall(async (data, context) => {
+exports.getEntitlement = functions.https.onCall(async ({ data, ...context }) => {
   try {
     const e = await getUserEntitlement(context);
 
@@ -512,9 +512,36 @@ const isEmulatorEnv = () =>
   !!process.env.FIREBASE_EMULATOR_HUB ||
   !!process.env.FIRESTORE_EMULATOR_HOST;
 
+/**
+ * Load Stripe config from Firestore admin/stripe.
+ *
+ * Document structure:
+ *   mode: "test" | "prod"           ← global switch
+ *   successUrl, cancelUrl, portalReturnUrl  ← shared across modes
+ *   test: { apiKey, publishableKey, productIds, priceIds, webhookSecret, mockWebhookSecret }
+ *   prod: { apiKey, publishableKey, productIds, priceIds, webhookSecret }
+ *
+ * Returns a flat config merging shared fields + the active mode's sub-object,
+ * plus a `_mode` field indicating which mode was selected.
+ */
 const getStripeAdminConfig = async () => {
   const snap = await db.collection('admin').doc('stripe').get();
-  return snap.exists ? snap.data() : null;
+  if (!snap.exists) return null;
+
+  const doc = snap.data();
+  const mode = String(doc.mode || 'test');
+
+  // Mode-specific sub-object (test or prod)
+  const modeConfig = doc[mode] || {};
+
+  // Merge: shared fields first, then mode-specific overrides, then _mode tag
+  return {
+    successUrl: doc.successUrl || null,
+    cancelUrl: doc.cancelUrl || null,
+    portalReturnUrl: doc.portalReturnUrl || null,
+    ...modeConfig,
+    _mode: mode,
+  };
 };
 
 const getStripeClient = (adminCfg) => {
@@ -522,9 +549,8 @@ const getStripeClient = (adminCfg) => {
   if (!apiKey.startsWith('sk_')) {
     throw new functions.https.HttpsError('failed-precondition', 'Stripe apiKey is missing in Firestore admin/stripe');
   }
-  return new Stripe(apiKey, {
-    apiVersion: '2024-06-20',
-  });
+  // Let the SDK use its pinned default API version (matches SDK types)
+  return new Stripe(apiKey);
 };
 
 const isStripeProStatus = (status) => {
@@ -534,21 +560,30 @@ const isStripeProStatus = (status) => {
 };
 
 // Callable: create a Stripe Checkout Session (Pro subscription)
-exports.stripeCreateCheckoutSession = functions.https.onCall(async (data, context) => {
+exports.stripeCreateCheckoutSession = functions.https.onCall(async ({ data, ...context }) => {
   const uid = validateAuth(context);
   const puid = await resolvePuidForUid(uid);
 
+  const plan = String(data?.plan || 'pro').toLowerCase(); // pro | business
   const billing = String(data?.billing || 'monthly'); // monthly | annual
+  const currency = String(data?.currency || 'usd').toLowerCase(); // usd | aud
+  if (plan !== 'pro' && plan !== 'business') {
+    throw new functions.https.HttpsError('invalid-argument', 'plan must be "pro" or "business"');
+  }
 
   const adminCfg = await getStripeAdminConfig();
   const stripe = getStripeClient(adminCfg);
 
   const priceIds = adminCfg?.priceIds || {};
-  const priceId = billing === 'annual' ? priceIds.pro_annual : priceIds.pro_monthly;
+  const billingKey = billing === 'annual' ? 'annual' : 'monthly';
+  // Currency suffix: "usd" is the default (no suffix), others get "_aud", "_eur", etc.
+  const currencySuffix = currency === 'usd' ? '' : `_${currency}`;
+  const priceIdKey = `${plan}_${billingKey}${currencySuffix}`;
+  const priceId = priceIds[priceIdKey];
   if (!priceId) {
     throw new functions.https.HttpsError(
       'failed-precondition',
-      'Missing price id in Firestore admin/stripe.priceIds for selected billing interval'
+      `Missing price id in Firestore admin/stripe.priceIds.${priceIdKey}`
     );
   }
 
@@ -564,12 +599,15 @@ exports.stripeCreateCheckoutSession = functions.https.onCall(async (data, contex
     metadata: {
       firebaseUid: uid,
       puid,
+      plan,
       billing,
+      currency,
     },
     subscription_data: {
       metadata: {
         firebaseUid: uid,
         puid,
+        plan,
       },
     },
   });
@@ -578,7 +616,7 @@ exports.stripeCreateCheckoutSession = functions.https.onCall(async (data, contex
 });
 
 // Callable: create a Stripe Customer Portal session (receipts + manage subscription)
-exports.stripeCreatePortalSession = functions.https.onCall(async (data, context) => {
+exports.stripeCreatePortalSession = functions.https.onCall(async ({ data, ...context }) => {
   const uid = validateAuth(context);
   const puid = await resolvePuidForUid(uid);
 
@@ -766,7 +804,7 @@ exports.stripeWebhookMock = functions.https.onRequest(async (req, res) => {
 // TTL cleanup function (scheduled)
 // Save per-user document type override (users are isolated)
 // Stored by puid+docHash so different users can have different classifications.
-exports.saveDocTypeOverride = functions.https.onCall(async (data, context) => {
+exports.saveDocTypeOverride = functions.https.onCall(async ({ data, ...context }) => {
   const { uid, puid } = await getUserEntitlement(context);
 
   const docHash = data?.docHash;
@@ -793,7 +831,7 @@ exports.saveDocTypeOverride = functions.https.onCall(async (data, context) => {
 });
 
 // Returns detected + override + effective document type state.
-exports.getDocumentTypeState = functions.https.onCall(async (data, context) => {
+exports.getDocumentTypeState = functions.https.onCall(async ({ data, ...context }) => {
   const { uid, puid } = await getUserEntitlement(context);
 
   const docHash = data?.docHash;
@@ -865,7 +903,7 @@ const getDocumentTypesIndex = async () => {
   return _documentTypesIndexCache.value;
 };
 
-exports.detectDocumentType = functions.https.onCall(async (data, context) => {
+exports.detectDocumentType = functions.https.onCall(async ({ data, ...context }) => {
   const { uid, puid, tier } = await getUserEntitlement(context);
 
   const docHash = data?.docHash;
@@ -945,7 +983,7 @@ exports.detectDocumentType = functions.https.onCall(async (data, context) => {
 
 // Type-specific analysis entrypoint.
 // NOTE: currently returns validation spec + metadata (AI execution will be wired in next).
-exports.analyzeByType = functions.https.onCall(async (data, context) => {
+exports.analyzeByType = functions.https.onCall(async ({ data, ...context }) => {
   const { uid, puid, tier } = await getUserEntitlement(context);
 
   const docHash = data?.docHash;
@@ -1089,9 +1127,9 @@ exports.analyzeByType = functions.https.onCall(async (data, context) => {
   };
 });
 
-exports.cleanupOldUsageRecords = scheduler.onSchedule('every day 01:00', {
-  timeZone: 'Australia/Sydney'
-}, async (context) => {
+exports.cleanupOldUsageRecords = functions.scheduler.onSchedule('every day 01:00', {
+  timeZone: 'Australia/Sydney',
+}, async (event) => {
     try {
       // Delete usage records older than configured TTL days
       const cutoffDate = new Date();
@@ -1224,13 +1262,16 @@ exports.setDocByPath = functions.https.onRequest(async (req, res) => {
     }
 
     // Merge-write so existing fields not in payload are preserved
+    // merge defaults to true; pass "merge": false in body to overwrite entirely
+    const shouldMerge = req.body.merge !== false;
+
     const docRef = db.doc(qpath);
     await docRef.set(
       {
         ...data,
         _updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       },
-      { merge: true }
+      { merge: shouldMerge }
     );
 
     // Read back to confirm
@@ -1246,3 +1287,4 @@ exports.setDocByPath = functions.https.onRequest(async (req, res) => {
     return res.status(500).json({ error: 'Internal error' });
   }
 });
+// deploy-stamp: 1770859826

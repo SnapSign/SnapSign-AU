@@ -1,10 +1,11 @@
 {
   "name": "snapsign-com-au",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build",
+    "build": "node ./scripts/write-version.mjs && astro build",
     "preview": "astro preview"
   },
   "dependencies": {

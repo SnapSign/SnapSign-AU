@@ -1,4 +1,7 @@
-const functions = require('firebase-functions');
+// firebase-functions v7: main export is v2 namespace (different onCall signature).
+// Our callable functions use v1 (data, context) pattern, so import v1 explicitly.
+const functions = require('firebase-functions/v1');
+const { scheduler } = require('firebase-functions/v2');
 const admin = require('firebase-admin');
 const fs = require('fs');
 const path = require('path');
@@ -1086,7 +1089,7 @@ exports.analyzeByType = functions.https.onCall(async (data, context) => {
   };
 });
 
-exports.cleanupOldUsageRecords = functions.scheduler.onSchedule('every day 01:00', {
+exports.cleanupOldUsageRecords = scheduler.onSchedule('every day 01:00', {
   timeZone: 'Australia/Sydney'
 }, async (context) => {
     try {
@@ -1120,3 +1123,126 @@ exports.cleanupOldUsageRecords = functions.scheduler.onSchedule('every day 01:00
       throw error;
     }
   });
+
+// ============================================================================
+// DOCUMENT RETRIEVAL BY PATH (FOR DEBUGGING / ADMIN)
+// ============================================================================
+exports.getDocByPath = functions.https.onRequest(async (req, res) => {
+  // Allow CORS for admin/dev tooling
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+
+  try {
+    const qpath = req.query.qpath;
+
+    if (!qpath || typeof qpath !== "string") {
+      return res.status(400).json({
+        error: "Missing or invalid qpath parameter"
+      });
+    }
+
+    // Security: Prevent reading from /constants collection
+    const pathParts = qpath.split('/');
+    if (pathParts.length > 0 && pathParts[0] === 'constants') {
+      return res.status(403).json({
+        error: "Access to constants collection is forbidden"
+      });
+    }
+
+    const docRef = db.doc(qpath);
+    const snap = await docRef.get();
+
+    if (!snap.exists) {
+      return res.status(404).json({
+        error: "Document not found",
+        path: qpath
+      });
+    }
+
+    return res.json({
+      path: qpath,
+      data: snap.data()
+    });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      error: "Internal error"
+    });
+  }
+});
+
+// ============================================================================
+// DOCUMENT WRITE BY PATH (FOR ADMIN CONFIG — e.g. Stripe keys/prices)
+// ============================================================================
+// POST /setDocByPath  { qpath: "admin/stripe", data: { apiKey: "sk_...", ... } }
+// Security: only allows writes to approved admin paths.
+exports.setDocByPath = functions.https.onRequest(async (req, res) => {
+  // CORS
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, x-admin-secret');
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed. Use POST.' });
+  }
+
+  try {
+    const { qpath, data } = req.body || {};
+
+    if (!qpath || typeof qpath !== 'string') {
+      return res.status(400).json({ error: 'Missing or invalid qpath parameter' });
+    }
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      return res.status(400).json({ error: 'Missing or invalid data object' });
+    }
+
+    // Whitelist: only allow writes to specific admin-managed paths
+    const ALLOWED_PREFIXES = ['admin/'];
+    const isAllowed = ALLOWED_PREFIXES.some((prefix) => qpath.startsWith(prefix));
+    if (!isAllowed) {
+      return res.status(403).json({
+        error: `Writes are only allowed to paths starting with: ${ALLOWED_PREFIXES.join(', ')}`,
+      });
+    }
+
+    // Block certain sensitive sub-paths
+    const BLOCKED_PATHS = ['admin/secrets'];
+    if (BLOCKED_PATHS.includes(qpath)) {
+      return res.status(403).json({ error: 'Write to this path is blocked' });
+    }
+
+    // Validate path has even number of segments (collection/doc)
+    const segments = qpath.split('/');
+    if (segments.length % 2 !== 0) {
+      return res.status(400).json({
+        error: 'qpath must point to a document (even number of path segments), e.g. admin/stripe',
+      });
+    }
+
+    // Merge-write so existing fields not in payload are preserved
+    const docRef = db.doc(qpath);
+    await docRef.set(
+      {
+        ...data,
+        _updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    // Read back to confirm
+    const snap = await docRef.get();
+
+    return res.json({
+      ok: true,
+      path: qpath,
+      data: snap.data(),
+    });
+  } catch (err) {
+    console.error('setDocByPath error:', err);
+    return res.status(500).json({ error: 'Internal error' });
+  }
+});

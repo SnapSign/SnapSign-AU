@@ -28,6 +28,68 @@
       ],
       "rewrites": [
         {
+          "source": "/api/setDocByPath",
+          "function": {
+            "functionId": "setDocByPath",
+            "region": "us-central1"
+          }
+        },
+        {
+          "source": "/api/getDocByPath",
+          "function": {
+            "functionId": "getDocByPath",
+            "region": "us-central1"
+          }
+        },
+        {
+          "source": "/view{,/**}",
+          "destination": "/app/index.html"
+        },
+        {
+          "source": "/edit{,/**}",
+          "destination": "/app/index.html"
+        },
+        {
+          "source": "/profile{,/**}",
+          "destination": "/app/index.html"
+        },
+        {
+          "source": "/sign-in{,/**}",
+          "destination": "/app/index.html"
+        },
+        {
+          "source": "/sign-up{,/**}",
+          "destination": "/app/index.html"
+        },
+        {
+          "source": "/pricing{,/**}",
+          "destination": "/app/index.html"
+        },
+        {
+          "source": "/about{,/**}",
+          "destination": "/app/index.html"
+        },
+        {
+          "source": "/privacy{,/**}",
+          "destination": "/app/index.html"
+        },
+        {
+          "source": "/terms{,/**}",
+          "destination": "/app/index.html"
+        },
+        {
+          "source": "/contact{,/**}",
+          "destination": "/app/index.html"
+        },
+        {
+          "source": "/sign{,/**}",
+          "destination": "/app/index.html"
+        },
+        {
+          "source": "/app{,/**}",
+          "destination": "/app/index.html"
+        },
+        {
           "source": "**",
           "destination": "/index.html"
         }

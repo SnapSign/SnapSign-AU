@@ -6,6 +6,10 @@ const admin = require('firebase-admin');
 const fs = require('fs');
 const path = require('path');
 const Stripe = require('stripe');
+const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+const { isProFlagEnabled } = require('./lib/entitlement');
+const { normalizeObjectKey, assertUserScopedKey } = require('./lib/storage-access');
 
 // In production on Firebase, Admin SDK uses application default credentials automatically.
 // For local development (emulators), we optionally bootstrap with a service account JSON file.
@@ -89,7 +93,8 @@ const getUserEntitlement = async (context) => {
   const userRef = db.collection('users').doc(puid);
   const userSnap = await userRef.get();
 
-  const isPro = !!(userSnap.exists && userSnap.data()?.subscription?.isPro);
+  const userData = userSnap.exists ? (userSnap.data() || {}) : {};
+  const isPro = isProFlagEnabled(userData);
 
   const tier = isPro ? 'pro' : (isAnonymous ? 'anonymous' : 'free');
 
@@ -99,6 +104,7 @@ const getUserEntitlement = async (context) => {
       {
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         lastSeenAt: admin.firestore.FieldValue.serverTimestamp(),
+        isPro: false,
         subscription: { isPro: false },
       },
       { merge: true }
@@ -505,6 +511,157 @@ exports.getEntitlement = functions.https.onCall(async ({ data, ...context }) => 
   }
 });
 
+// --- MinIO / S3 (Firestore-backed config, no env secrets) ---
+
+/**
+ * Load storage config from Firestore admin/minio.
+ *
+ * Document structure:
+ *   mode: "test" | "prod"
+ *   endpoint, bucket, region, forcePathStyle    <- shared
+ *   prod: { accessKey, secretKey }
+ *   test: { accessKey, secretKey }              <- optional
+ *
+ * Returns a flat config for active mode + `_mode`.
+ */
+const getStorageAdminConfig = async () => {
+  const snap = await db.collection('admin').doc('minio').get();
+  if (!snap.exists) return null;
+
+  const doc = snap.data();
+  const mode = String(doc.mode || 'prod');
+  const modeConfig = doc[mode] || {};
+
+  return {
+    endpoint: doc.endpoint || null,
+    bucket: doc.bucket || null,
+    region: doc.region || 'us-east-1',
+    forcePathStyle: doc.forcePathStyle !== false,
+    ...modeConfig,
+    _mode: mode,
+  };
+};
+
+const getStorageClient = (storageCfg) => {
+  const endpoint = String(storageCfg?.endpoint || '');
+  const bucket = String(storageCfg?.bucket || '');
+  const accessKey = String(storageCfg?.accessKey || '');
+  const secretKey = String(storageCfg?.secretKey || '');
+  const region = String(storageCfg?.region || 'us-east-1');
+  const forcePathStyle = storageCfg?.forcePathStyle !== false;
+
+  if (!/^https?:\/\//.test(endpoint)) {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'Storage endpoint is missing in Firestore admin/minio.endpoint'
+    );
+  }
+  if (!bucket) {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'Storage bucket is missing in Firestore admin/minio.bucket'
+    );
+  }
+  if (!accessKey || !secretKey) {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'Storage credentials are missing in Firestore admin/minio.<mode>'
+    );
+  }
+
+  return {
+    s3: new S3Client({
+      endpoint,
+      region,
+      forcePathStyle,
+      credentials: {
+        accessKeyId: accessKey,
+        secretAccessKey: secretKey,
+      },
+    }),
+    endpoint,
+    bucket,
+    region,
+  };
+};
+
+const ensureProStorageAccess = (entitlement) => {
+  if (!entitlement?.isPro && entitlement?.tier !== 'pro') {
+    throw new functions.https.HttpsError(
+      'permission-denied',
+      'Storage access requires a Pro subscription.'
+    );
+  }
+};
+
+// Callable: create a pre-signed PUT URL for direct upload to MinIO.
+exports.storageCreateUploadUrl = functions.https.onCall(async ({ data, ...context }) => {
+  const entitlement = await getUserEntitlement(context);
+  ensureProStorageAccess(entitlement);
+
+  const storageCfg = await getStorageAdminConfig();
+  const { s3, bucket, endpoint } = getStorageClient(storageCfg);
+
+  const requestedKey = normalizeObjectKey(data?.key);
+  const contentType = String(data?.contentType || 'application/octet-stream');
+  const expiresIn = Math.min(Math.max(Number(data?.expiresIn || 300), 60), 3600);
+
+  // Enforce per-user namespace to avoid cross-user key collisions/access.
+  const key = requestedKey
+    ? (requestedKey.startsWith(`${entitlement.puid}/`) ? requestedKey : `${entitlement.puid}/${requestedKey}`)
+    : `${entitlement.puid}/uploads/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.bin`;
+
+  const command = new PutObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    ContentType: contentType,
+  });
+  const url = await getSignedUrl(s3, command, { expiresIn });
+
+  return {
+    key,
+    bucket,
+    endpoint,
+    method: 'PUT',
+    contentType,
+    expiresIn,
+    url,
+  };
+});
+
+// Callable: create a pre-signed GET URL for direct download from MinIO.
+exports.storageCreateDownloadUrl = functions.https.onCall(async ({ data, ...context }) => {
+  const entitlement = await getUserEntitlement(context);
+  ensureProStorageAccess(entitlement);
+
+  const storageCfg = await getStorageAdminConfig();
+  const { s3, bucket, endpoint } = getStorageClient(storageCfg);
+
+  const key = normalizeObjectKey(data?.key);
+  if (!key) {
+    throw new functions.https.HttpsError('invalid-argument', 'key is required');
+  }
+  if (!assertUserScopedKey(key, entitlement.puid)) {
+    throw new functions.https.HttpsError(
+      'permission-denied',
+      'key must be scoped to the authenticated user namespace'
+    );
+  }
+
+  const expiresIn = Math.min(Math.max(Number(data?.expiresIn || 300), 60), 3600);
+  const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+  const url = await getSignedUrl(s3, command, { expiresIn });
+
+  return {
+    key,
+    bucket,
+    endpoint,
+    method: 'GET',
+    expiresIn,
+    url,
+  };
+});
+
 // --- Stripe (mock webhook + future real webhook) ---
 
 const isEmulatorEnv = () =>
@@ -645,6 +802,8 @@ const upsertStripeSubscriptionState = async ({ puid, stripeStatus, customerId, s
 
   await db.collection('users').doc(puid).set(
     {
+      // Canonical entitlement flag consumed by getUserEntitlement.
+      isPro,
       subscription: {
         provider: 'stripe',
         customerId: customerId || null,

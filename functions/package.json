@@ -11,12 +11,17 @@
     "logs": "firebase functions:log",
     "test": "mocha test/**/*.test.js --timeout 30000",
     "test:unit": "mocha test/functions.test.js --timeout 10000",
-    "test:stripe": "mocha test/stripe.test.js --timeout 30000"
+    "test:entitlement": "mocha test/entitlement-storage-policy.test.js --timeout 10000",
+    "test:set-pro-flag": "node test/set-user-pro-flag.js",
+    "test:stripe": "mocha test/stripe.test.js --timeout 30000",
+    "test:minio": "mocha test/minio.test.js --timeout 30000"
   },
   "engines": {
     "node": "22"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.922.0",
+    "@aws-sdk/s3-request-presigner": "^3.922.0",
     "crypto-js": "^4.2.0",
     "firebase-admin": "^13.6.1",
     "firebase-functions": "^7.0.5",

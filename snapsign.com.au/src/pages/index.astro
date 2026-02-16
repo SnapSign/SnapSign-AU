@@ -2,11 +2,11 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 import SiteHeader from "../components/SiteHeader.astro";
 
-const title = "Snap Sign Pty Ltd | Corporate Site";
+const title = "Snap Sign | AI-Powered Document Intelligence & Enterprise Signing";
 const description =
-  "Snap Sign Pty Ltd is a startup building AI tools for document clarity and security. DecoDocs is the flagship product.";
+  "Snap Sign Pty Ltd builds AI tools for document clarity and enterprise signing. DecoDocs decodes contracts before you commit.";
 const ogDescription =
-  "Snap Sign Pty Ltd is a startup building AI tools for document clarity and security. DecoDocs is the flagship product.";
+  "Snap Sign Pty Ltd builds AI tools for document clarity and enterprise signing. DecoDocs decodes contracts before you commit.";
 const canonical = "https://snapsign.com.au/";
 ---
 <BaseLayout
@@ -15,7 +15,7 @@ const canonical = "https://snapsign.com.au/";
   canonical={canonical}
   ogDescription={ogDescription}
   ogUrl={canonical}
-  ogSiteName="Snap Sign Pty Ltd"
+  ogSiteName="Snap Sign"
 >
 
   <div class="container">
@@ -24,10 +24,10 @@ const canonical = "https://snapsign.com.au/";
     <section class="hero" id="hero">
       <div class="hero-grid">
         <div class="hero-copy">
-          <span class="eyebrow">Modern document intelligence</span>
-          <h1>Snap Sign Pty Ltd builds AI to decode documents before you sign.</h1>
+          <span class="eyebrow">AI-powered document intelligence</span>
+          <h1>Decode documents before you sign. With AI precision.</h1>
           <p class="hero-lede">
-            DecoDocs turns dense PDFs into clear decisions with AI summaries, risk flags, and evidence-backed explanations.
+            DecoDocs turns dense contracts and PDFs into clear decisions — with AI summaries, risk flags, and evidence-backed explanations.
           </p>
           <div class="hero-actions">
             <a
@@ -49,10 +49,9 @@ const canonical = "https://snapsign.com.au/";
               Pro includes vaults &amp; history
             </span>
           </div>
-          <p class="powered-by">Flagship product: <strong>DecoDocs</strong></p>
         </div>
         <div class="hero-media">
-          <img src="images/snap.webp" alt="DecoDocs preview" />
+          <img src="images/snap.webp" alt="DecoDocs AI document analysis preview" />
         </div>
       </div>
     </section>
@@ -98,11 +97,10 @@ const canonical = "https://snapsign.com.au/";
         </div>
         <a
           href="https://decodocs.com/?entry_problem=product_spotlight&utm_source=snapsign.com.au&utm_medium=landing&utm_campaign=spotlight"
-          class="button secondary"
+          class="btn-teal"
         >
           Try DecoDocs
         </a>
-        <p class="powered-by">A Snap Sign Pty Ltd product</p>
       </div>
       <div class="spotlight-media">
         <img src="images/snap.webp" alt="See DecoDocs in action" />
@@ -179,25 +177,34 @@ const canonical = "https://snapsign.com.au/";
       </ul>
     </section>
 
-    <section class="leadership">
-      <h2>Leadership</h2>
-      <div class="leader-card">
-        <img
-          class="leader-photo"
-          src="images/irina-vasilkova.webp"
-          width="180"
-          height="220"
-          alt="Iryna Vasylkova"
-          loading="lazy"
-        />
-        <div class="leader-content">
-          <h3>Iryna Vasylkova</h3>
-          <p class="leader-title">Founder &amp; CEO</p>
+    <section class="founder-section" id="founder">
+      <div class="founder-card">
+        <div class="founder-image-wrap">
+          <img
+            class="founder-image"
+            src="images/irina-vasilkova.webp"
+            width="320"
+            height="400"
+            alt="Iryna Vasylkova — Founder & CEO of Snap Sign"
+            loading="lazy"
+          />
+        </div>
+        <div class="founder-copy">
+          <span class="eyebrow">The Engineering Mind</span>
+          <h2>Precision Engineering meets Legal Clarity.</h2>
           <p>
-            Iryna Vasylkova leads Snap Sign Pty Ltd with a focus on making secure, understandable document workflows
-            accessible for freelancers and small businesses. With a background in language services and cross‑cultural
-            collaboration, she brings a clarity‑first mindset to building AI products that help teams act with confidence.
+            Built by data engineer Iryna Vasylkova, SnapSign was created to solve a singular problem: the complexity of digital commitment. We integrate DecoDocs AI to ensure you don't just sign — you understand.
           </p>
+          <span class="founder-name">Iryna Vasylkova</span>
+          <span class="founder-title-label">Founder &amp; CEO, Snap Sign Pty Ltd</span>
+          <div style="margin-top: 20px;">
+            <a
+              class="btn-teal"
+              href="https://decodocs.com/?utm_source=snapsign.com.au&utm_medium=landing&utm_campaign=founder_cta"
+            >
+              Explore DecoDocs AI
+            </a>
+          </div>
         </div>
       </div>
     </section>
@@ -229,11 +236,10 @@ const canonical = "https://snapsign.com.au/";
     </section>
 
     <section class="cta">
-      <h2>Join the DecoDocs Early Access</h2>
-      <a href="https://eepurl.com/i165U-" class="button">Get Early Access</a>
+      <h2>Ready to decode your next document?</h2>
+      <a href="https://decodocs.com/?utm_source=snapsign.com.au&utm_medium=landing&utm_campaign=bottom_cta" class="button primary-cta">Get Started Free</a>
       <p>
-        Be the first to try new decoding features for freelancers and small businesses. We'll only email product updates
-        and access invites.
+        Upload a contract, policy, or report. DecoDocs AI analyses it in seconds — plain-English summaries, risk flags, and shareable reports included.
       </p>
     </section>
 

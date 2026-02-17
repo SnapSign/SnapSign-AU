@@ -4,7 +4,6 @@
   "description": "Cloud Functions for Firebase",
   "scripts": {
     "version:write": "node ./scripts/write-version.mjs",
-    "serve": "firebase emulators:start --only functions",
     "shell": "firebase functions:shell",
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
@@ -14,24 +13,30 @@
     "test:entitlement": "mocha test/entitlement-storage-policy.test.js --timeout 10000",
     "test:set-pro-flag": "node test/set-user-pro-flag.js",
     "test:stripe": "mocha test/stripe.test.js --timeout 30000",
-    "test:minio": "mocha test/minio.test.js --timeout 30000"
+    "test:minio": "mocha test/minio.test.js --timeout 30000",
+    "promptpacks:validate": "node ./scripts/validate-prompt-packs.mjs"
   },
   "engines": {
     "node": "22"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.922.0",
-    "@aws-sdk/s3-request-presigner": "^3.922.0",
+    "@aws-sdk/client-s3": "^3.991.0",
+    "@aws-sdk/s3-request-presigner": "^3.991.0",
+    "@google/generative-ai": "^0.24.1",
+    "adm-zip": "^0.5.16",
     "crypto-js": "^4.2.0",
     "firebase-admin": "^13.6.1",
     "firebase-functions": "^7.0.5",
+    "pdfjs-dist": "^5.4.624",
     "stripe": "^20.3.1"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.0",
     "chai": "^6.2.2",
     "firebase-functions-test": "^3.4.1",
-    "mocha": "^11.7.5"
+    "gray-matter": "^4.0.3",
+    "mocha": "^11.7.5",
+    "sinon": "^21.0.1"
   },
   "private": true
 }

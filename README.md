@@ -14,6 +14,7 @@ DecoDocs is a document analysis platform that uses AI to help users understand c
 - Anonymous document analysis (no account required)
 - Client-side PDF text extraction
 - Document fingerprinting using SHA-256 hashing
+- Client-side `.snapsign` envelope handling (JSZip)
 - AI-powered document analysis with plain-English explanations
 - Risk identification and categorization
 - Interactive document viewer with highlights
@@ -71,7 +72,25 @@ npm run dev
 ### Firebase Functions
 - `preflightCheck`: Classify documents and estimate AI usage without calling AI
 - `analyzeText`: Perform main document analysis
+- `explainSelection`: Explain selected document text in plain language
+- `highlightRisks`: Identify and structure document risks
+- `translateToPlainEnglish`: Convert legal text to plain English
+- `analyzeByType`: Run type-specific analysis using detected/overridden document type
+- `detectDocumentType`: Classify document category/type
+- `getDocumentTypeState`: Return detected/override/effective type state
+- `saveDocTypeOverride`: Persist per-user type override
 - `getEntitlement`: Retrieve user plan and limits
+
+### Envelope Handling (Client-Side)
+- `.snapsign` is a ZIP container processed in the browser (no envelope HTTP endpoint in Functions).
+- Implemented in `Decodocs/web/src/services/envelopeService.js`.
+- Supports:
+  - create envelope from PDF
+  - extract/validate envelope
+  - embed optional `analysis.json` and `audit.json`
+- Core container files:
+  - `document.pdf`
+  - `manifest.json` (includes document SHA-256)
 
 ### Authentication
 - Anonymous authentication required for all AI operations
@@ -80,6 +99,7 @@ npm run dev
 
 ## Security
 - Client-side text extraction ensures documents never leave the browser
+- Client-side envelope extraction/validation keeps raw documents in browser for free flow
 - Anonymous authentication protects user privacy
 - Firestore security rules prevent unauthorized access
 - Usage limits enforce fair use policies

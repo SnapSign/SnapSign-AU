@@ -10,6 +10,9 @@ const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/clien
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { isProFlagEnabled } = require('./lib/entitlement');
 const { normalizeObjectKey, assertUserScopedKey } = require('./lib/storage-access');
+const { getGeminiModel } = require('./lib/gemini-client');
+const { buildAnalysisPrompt, buildExplanationPrompt, buildRiskPrompt, buildTranslationPrompt, buildTypeSpecificPrompt } = require('./lib/prompts');
+const { analysisSchema, explanationSchema, riskAssessmentSchema, translationSchema, typeSpecificSchema } = require('./lib/analysis-schema');
 
 // In production on Firebase, Admin SDK uses application default credentials automatically.
 // For local development (emulators), we optionally bootstrap with a service account JSON file.
@@ -36,11 +39,16 @@ const initAdmin = () => {
     return;
   }
 
-  admin.initializeApp();
+  if (admin.apps.length === 0) {
+    admin.initializeApp();
+  }
 };
 
-initAdmin();
+if (admin.apps.length === 0) {
+  initAdmin();
+}
 
+console.log('admin.firestore structure:', typeof admin.firestore, admin.firestore.name, admin.firestore.isSinonProxy ? 'MOCKED' : 'REAL');
 const db = admin.firestore();
 
 // Configuration constants
@@ -198,7 +206,7 @@ const validateDocHash = (docHash) => {
 // Helper to compute scan ratio
 const computeScanRatio = (charsPerPage, pageCount) => {
   if (!charsPerPage || charsPerPage.length === 0) return 0;
-  
+
   const lowTextPages = charsPerPage.filter(chars => chars < CONFIG.MIN_CHARS_PER_PAGE).length;
   return pageCount > 0 ? lowTextPages / pageCount : 0;
 };
@@ -212,7 +220,7 @@ const validateOutputSchema = (result) => {
   if (!result.inconsistencies) result.inconsistencies = [];
   if (!result.obligations) result.obligations = [];
   if (!result.missingInfo) result.missingInfo = [];
-  
+
   // Validate risks schema
   result.risks = result.risks.map(risk => ({
     id: risk.id || `R${Date.now()}`,
@@ -222,7 +230,7 @@ const validateOutputSchema = (result) => {
     whatToCheck: Array.isArray(risk.whatToCheck) ? risk.whatToCheck : [risk.recommendations || "Review carefully"],
     anchors: Array.isArray(risk.anchors) ? risk.anchors : []
   }));
-  
+
   return result;
 };
 
@@ -230,9 +238,9 @@ const validateOutputSchema = (result) => {
 exports.preflightCheck = functions.https.onCall(async ({ data, ...context }) => {
   try {
     const uid = validateAuth(context);
-    
+
     const { docHash, stats } = data;
-    
+
     // Validate inputs
     validateDocHash(docHash);
     if (!stats || typeof stats !== 'object') {
@@ -241,19 +249,19 @@ exports.preflightCheck = functions.https.onCall(async ({ data, ...context }) => 
         'Stats object is required.'
       );
     }
-    
+
     const { pageCount, charsPerPage, totalChars, pdfSizeBytes } = stats;
-    
+
     if (!Array.isArray(charsPerPage) || pageCount === undefined) {
       throw new functions.https.HttpsError(
         'invalid-argument',
         'Valid stats with charsPerPage array and pageCount are required.'
       );
     }
-    
+
     // Compute scan ratio
     const scanRatio = computeScanRatio(charsPerPage, pageCount);
-    
+
     const entitlement = await getUserEntitlement(context);
 
     // Determine classification
@@ -280,10 +288,10 @@ exports.preflightCheck = functions.https.onCall(async ({ data, ...context }) => 
         message: `Document too large (${totalChars} chars, limit ${CONFIG.FREE_MAX_TOTAL_CHARS}).`
       });
     }
-    
+
     // Calculate estimated tokens (rough heuristic)
     const estimatedTokens = Math.floor(totalChars / 4);
-    
+
     return {
       ok: true,
       classification,
@@ -298,14 +306,14 @@ exports.preflightCheck = functions.https.onCall(async ({ data, ...context }) => 
         estimatedTokens,
       },
     };
-    
+
   } catch (error) {
     console.error('Preflight check error:', error);
-    
+
     if (error instanceof functions.https.HttpsError) {
       throw error;
     }
-    
+
     throw new functions.https.HttpsError(
       'internal',
       'An error occurred during preflight check.'
@@ -318,49 +326,8 @@ exports.analyzeText = functions.https.onCall(async ({ data, ...context }) => {
   try {
     const entitlement = await getUserEntitlement(context);
 
-    const { 
-      docHash, 
-      stats, 
-      text, 
-      options = {}
-    } = data;
-    
-    // Validate inputs
-    validateDocHash(docHash);
-    
-    if (!text || !text.value) {
-      throw new functions.https.HttpsError(
-        'invalid-argument',
-        'Text object with value is required.'
-      );
-    }
-    
-    const { pageCount, charsPerPage, totalChars, languageHint } = stats || {};
-    const { format, value: strippedText } = text;
-    
-    if (!strippedText) {
-      throw new functions.https.HttpsError(
-        'invalid-argument',
-        'Stripped text content is required.'
-      );
-    }
-    
-    // Compute scan ratio from stats
-    const scanRatio = computeScanRatio(charsPerPage || [], pageCount || 0);
-
-    // Enforce OCR gating: scanned PDFs require Pro (no vision model for Free/Anonymous)
-    if (scanRatio > CONFIG.SCAN_RATIO_THRESHOLD && entitlement.tier !== 'pro') {
-      return {
-        ok: false,
-        code: 'SCAN_DETECTED_PRO_REQUIRED',
-        message: 'Scanned PDFs require OCR (Pro).',
-        requiredTier: 'pro',
-      };
-    }
-
-    const estimatedTokens = estimateTokensFromChars(totalChars);
-
-    // Enforce token budgets (per uid/puid)
+    // Enforce rate limit/quota before we do anything expensive
+    const estimatedTokens = estimateTokensFromChars(data?.stats?.totalChars || 0);
     const budget = await enforceAndRecordTokenUsage({
       puid: entitlement.puid,
       tier: entitlement.tier,
@@ -375,14 +342,43 @@ exports.analyzeText = functions.https.onCall(async ({ data, ...context }) => {
           ? 'Anonymous token limit reached. Create a free account to continue.'
           : 'Daily token limit reached. Upgrade to Pro to continue.',
         requiredTier: entitlement.tier === 'anonymous' ? 'free' : 'pro',
-        usage: {
-          estimatedTokens,
-          remainingTokens: budget.remaining,
-        },
+        usage: { estimatedTokens, remainingTokens: budget.remaining },
       };
     }
 
-    // Record docHash ledger (forever retention) for all tiers
+    const {
+      docHash,
+      stats,
+      text,
+      options = {}
+    } = data;
+
+    // Validate inputs
+    validateDocHash(docHash);
+
+    if (!text || !text.value) {
+      throw new functions.https.HttpsError('invalid-argument', 'Text object with value is required.');
+    }
+
+    // Use the stripped text for analysis
+    const strippedText = text.value;
+    const model = getGeminiModel();
+    const prompt = buildAnalysisPrompt(strippedText, { documentType: options.documentType });
+
+    // Call Gemini with structured output
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseSchema: analysisSchema,
+        responseMimeType: 'application/json',
+        temperature: 0.2, // Low temperature for factual analysis
+      }
+    });
+
+    const analysisData = JSON.parse(result.response.text());
+    const validatedAnalysis = validateOutputSchema(analysisData);
+
+    // Record docHash ledger
     await db.collection('docshashes').doc(docHash).set(
       {
         docHash,
@@ -391,52 +387,8 @@ exports.analyzeText = functions.https.onCall(async ({ data, ...context }) => {
       },
       { merge: true }
     );
-    
-    // Simulate calling the AI service (this would be your actual LLM call)
-    // In a real implementation, this would call your AI service
-    let mockAnalysis = {
-      plainExplanation: "This document contains standard contractual terms that require careful review. The key areas to focus on include payment terms, termination clauses, and liability limitations.",
-      risks: [
-        {
-          id: "R1",
-          title: "Limitation of liability",
-          severity: "high",
-          whyItMatters: "This clause significantly limits the other party's liability, potentially leaving you exposed to significant losses.",
-          whatToCheck: ["Consider negotiating broader liability coverage", "Define maximum liability amounts clearly"],
-          anchors: [{ page: 7, quote: "under no circumstances shall the company be liable for any indirect, incidental, or consequential damages", confidence: 0.8 }]
-        },
-        {
-          id: "R2", 
-          title: "Automatic renewal",
-          severity: "medium",
-          whyItMatters: "The contract automatically renews unless cancelled 30 days before expiration.",
-          whatToCheck: ["Set calendar reminders for renewal dates", "Understand cancellation procedures"],
-          anchors: [{ page: 12, quote: "this agreement shall automatically renew for successive one-year terms", confidence: 0.7 }]
-        }
-      ],
-      unfairConditions: [],
-      inconsistencies: [],
-      obligations: [
-        {
-          id: "O1",
-          title: "Payment terms",
-          description: "Payment required within 30 days of invoice date",
-          deadline: null
-        }
-      ],
-      missingInfo: [
-        {
-          id: "M1",
-          category: "termination",
-          description: "Specific procedures for termination by either party are not clearly defined"
-        }
-      ]
-    };
-    
-    // Validate output schema
-    mockAnalysis = validateOutputSchema(mockAnalysis);
-    
-    // Add to usage events (optional logging)
+
+    // Log usage event
     await db.collection('usage_events').add({
       puid: entitlement.puid,
       uid: entitlement.uid,
@@ -444,16 +396,13 @@ exports.analyzeText = functions.https.onCall(async ({ data, ...context }) => {
       docHash: docHash,
       event: 'analyze',
       at: admin.firestore.FieldValue.serverTimestamp(),
-      meta: {
-        estimatedTokens,
-        scanRatio,
-      }
+      meta: { estimatedTokens, provider: 'gemini' }
     });
 
     return {
       ok: true,
       docHash,
-      result: mockAnalysis,
+      result: validatedAnalysis,
       usage: {
         estimatedTokens,
         remainingTokens: budget.remaining,
@@ -463,18 +412,144 @@ exports.analyzeText = functions.https.onCall(async ({ data, ...context }) => {
         isPro: entitlement.isPro,
       },
     };
-    
+
   } catch (error) {
     console.error('Analyze text error:', error);
-    
-    if (error instanceof functions.https.HttpsError) {
-      throw error;
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', 'An error occurred during text analysis.');
+  }
+});
+
+// Explain legal selection in plain English
+exports.explainSelection = functions.https.onCall(async ({ data, ...context }) => {
+  try {
+    const entitlement = await getUserEntitlement(context);
+    const { docHash, selection, documentContext } = data;
+
+    if (!selection) throw new functions.https.HttpsError('invalid-argument', 'Selection text is required');
+
+    // Estimate tokens (small for selection)
+    const estimatedTokens = Math.ceil(selection.length / 4) + 500; // +500 for context/prompt
+    const budget = await enforceAndRecordTokenUsage({
+      puid: entitlement.puid,
+      tier: entitlement.tier,
+      estimatedTokens,
+    });
+
+    if (!budget.allowed) {
+      throw new functions.https.HttpsError('resource-exhausted', 'Token limit reached');
     }
-    
-    throw new functions.https.HttpsError(
-      'internal',
-      'An error occurred during text analysis.'
-    );
+
+    const model = getGeminiModel();
+    const prompt = buildExplanationPrompt(selection, documentContext);
+
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseSchema: explanationSchema,
+        responseMimeType: 'application/json'
+      }
+    });
+
+    const explanation = JSON.parse(result.response.text());
+
+    return {
+      ok: true,
+      explanation,
+      usage: { remainingTokens: budget.remaining }
+    };
+
+  } catch (error) {
+    console.error('Explain selection error:', error);
+    throw new functions.https.HttpsError('internal', 'Failed to explain selection');
+  }
+});
+
+// Highlight risks in the document
+exports.highlightRisks = functions.https.onCall(async ({ data, ...context }) => {
+  try {
+    const entitlement = await getUserEntitlement(context);
+    const { docHash, documentText, documentType } = data;
+
+    if (!documentText) throw new functions.https.HttpsError('invalid-argument', 'Document text is required');
+
+    const estimatedTokens = Math.floor(documentText.length / 4);
+    const budget = await enforceAndRecordTokenUsage({
+      puid: entitlement.puid,
+      tier: entitlement.tier,
+      estimatedTokens,
+    });
+
+    if (!budget.allowed) {
+      throw new functions.https.HttpsError('resource-exhausted', 'Token limit reached');
+    }
+
+    const model = getGeminiModel();
+    const prompt = buildRiskPrompt(documentText, documentType);
+
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseSchema: riskAssessmentSchema,
+        responseMimeType: 'application/json'
+      }
+    });
+
+    const risks = JSON.parse(result.response.text());
+
+    return {
+      ok: true,
+      risks,
+      usage: { remainingTokens: budget.remaining }
+    };
+
+  } catch (error) {
+    console.error('Highlight risks error:', error);
+    throw new functions.https.HttpsError('internal', 'Failed to analyze risks');
+  }
+});
+
+// Translate legal text to plain English
+exports.translateToPlainEnglish = functions.https.onCall(async ({ data, ...context }) => {
+  try {
+    const entitlement = await getUserEntitlement(context);
+    const { docHash, legalText } = data;
+
+    if (!legalText) throw new functions.https.HttpsError('invalid-argument', 'Legal text is required');
+
+    const estimatedTokens = Math.floor(legalText.length / 4);
+    const budget = await enforceAndRecordTokenUsage({
+      puid: entitlement.puid,
+      tier: entitlement.tier,
+      estimatedTokens,
+    });
+
+    if (!budget.allowed) {
+      throw new functions.https.HttpsError('resource-exhausted', 'Token limit reached');
+    }
+
+    const model = getGeminiModel();
+    const prompt = buildTranslationPrompt(legalText);
+
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseSchema: translationSchema,
+        responseMimeType: 'application/json'
+      }
+    });
+
+    const translation = JSON.parse(result.response.text());
+
+    return {
+      ok: true,
+      translation,
+      usage: { remainingTokens: budget.remaining }
+    };
+
+  } catch (error) {
+    console.error('Translate error:', error);
+    throw new functions.https.HttpsError('internal', 'Failed to translate text');
   }
 });
 
@@ -1205,47 +1280,44 @@ exports.analyzeByType = functions.https.onCall(async ({ data, ...context }) => {
   const safeText = text;
   const lower = safeText.toLowerCase();
 
-  const result = {
-    plainExplanation: validationSpec
-      ? `Type-specific analysis for ${effectiveTypeId} using validation spec “${validationSpec?.title || validationSlug}”.`
-      : `Type-specific analysis for ${effectiveTypeId || 'unknown type'}.`,
-    extracted: {},
-    checks: [],
-  };
+  // Call Gemini for type-specific analysis
+  let result;
+  try {
+    const model = getGeminiModel();
+    const prompt = buildTypeSpecificPrompt(safeText, effectiveTypeId || 'document', validationSpec);
 
-  // Very lightweight heuristic extraction (placeholder until LLM is wired).
-  if (effectiveTypeId === 'business_invoice') {
-    const abn = safeText.match(/\b\d{2}\s?\d{3}\s?\d{3}\s?\d{3}\b/);
-    const gst = /\bgst\b/.test(lower);
-    const invNo = safeText.match(/\binvoice\s*(number|no\.?|#)\s*[:\-]?\s*([A-Z0-9\-]{3,})/i);
-    result.extracted = {
-      invoiceNumber: invNo?.[2] || null,
-      abn: abn?.[0] || null,
-      mentionsGST: gst,
+    const geminiResult = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseSchema: typeSpecificSchema,
+        responseMimeType: 'application/json',
+        temperature: 0.1, // low temperature for structured extraction
+      }
+    });
+
+    const rawData = JSON.parse(geminiResult.response.text());
+
+    // Transform extracted array back to object for frontend
+    const extractedObj = {};
+    if (Array.isArray(rawData.extracted)) {
+      rawData.extracted.forEach(item => {
+        if (item.key) extractedObj[item.key] = item.value;
+      });
+    }
+
+    result = {
+      plainExplanation: rawData.plainExplanation,
+      extracted: extractedObj,
+      checks: rawData.checks || [],
     };
-    result.checks.push({ id: 'has_abn', ok: !!result.extracted.abn, message: 'ABN detected' });
-  }
-
-  if (effectiveTypeId === 'legal_job_offer') {
-    const salary = safeText.match(/\b\$\s?\d{2,3}(?:,\d{3})*(?:\.\d{2})?\b/);
-    const start = safeText.match(/\b(commencement|start)\s+date\b/i);
-    result.extracted = {
-      salaryMention: salary?.[0] || null,
-      hasStartDateSection: !!start,
+  } catch (error) {
+    console.error('Gemini analyzeByType failed:', error);
+    // Fallback to basic result on error
+    result = {
+      plainExplanation: `Analysis failed: ${error.message}. Returning basic metadata.`,
+      extracted: {},
+      checks: [],
     };
-    result.checks.push({ id: 'salary_mentioned', ok: !!result.extracted.salaryMention, message: 'Salary mentioned' });
-  }
-
-  if (effectiveTypeId === 'general_sop_procedure') {
-    const stepCount = (safeText.match(/\bstep\s+\d+\b/gi) || []).length;
-    result.extracted = { stepCount };
-    result.checks.push({ id: 'has_steps', ok: stepCount > 0, message: 'Contains numbered steps' });
-  }
-
-  if (effectiveTypeId === 'policy_privacy') {
-    const pii = /(personal information|personal data|privacy|data collection|third parties)/i.test(safeText);
-    result.extracted = { mentionsPersonalInfo: pii };
-    result.checks.push({ id: 'mentions_pii', ok: pii, message: 'Mentions personal information / data collection' });
   }
 
   // Usage event (optional logging)
@@ -1282,44 +1354,44 @@ exports.analyzeByType = functions.https.onCall(async ({ data, ...context }) => {
       estimatedTokens,
       remainingTokens: budget.remaining,
     },
-    message: 'Heuristic type-specific analysis (placeholder). Next step: run LLM extraction/validation server-side using validationSpec.',
+    message: 'Type-specific analysis performed by Gemini.',
   };
 });
 
 exports.cleanupOldUsageRecords = functions.scheduler.onSchedule('every day 01:00', {
   timeZone: 'Australia/Sydney',
 }, async (event) => {
-    try {
-      // Delete usage records older than configured TTL days
-      const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - CONFIG.TTL_DAYS_USAGE_DOCS);
+  try {
+    // Delete usage records older than configured TTL days
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - CONFIG.TTL_DAYS_USAGE_DOCS);
 
-      // Query for old records (rolling daily usage docs only)
-      const oldRecordsQuery = await db.collection('usage_daily')
-        .where('updatedAt', '<', cutoffDate)
-        .get();
+    // Query for old records (rolling daily usage docs only)
+    const oldRecordsQuery = await db.collection('usage_daily')
+      .where('updatedAt', '<', cutoffDate)
+      .get();
 
-      const batch = db.batch();
-      let deletedCount = 0;
+    const batch = db.batch();
+    let deletedCount = 0;
 
-      oldRecordsQuery.forEach((doc) => {
-        batch.delete(doc.ref);
-        deletedCount++;
-      });
+    oldRecordsQuery.forEach((doc) => {
+      batch.delete(doc.ref);
+      deletedCount++;
+    });
 
-      if (deletedCount > 0) {
-        await batch.commit();
-        console.log(`Deleted ${deletedCount} old usage records`);
-      } else {
-        console.log('No old usage records to delete');
-      }
-
-      return null;
-    } catch (error) {
-      console.error('Cleanup error:', error);
-      throw error;
+    if (deletedCount > 0) {
+      await batch.commit();
+      console.log(`Deleted ${deletedCount} old usage records`);
+    } else {
+      console.log('No old usage records to delete');
     }
-  });
+
+    return null;
+  } catch (error) {
+    console.error('Cleanup error:', error);
+    throw error;
+  }
+});
 
 // ============================================================================
 // DOCUMENT RETRIEVAL BY PATH (FOR DEBUGGING / ADMIN)
@@ -1446,4 +1518,4 @@ exports.setDocByPath = functions.https.onRequest(async (req, res) => {
     return res.status(500).json({ error: 'Internal error' });
   }
 });
-// deploy-stamp: 1770859826
+

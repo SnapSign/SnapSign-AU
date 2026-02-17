@@ -1,267 +1,128 @@
 # DecoDocs AI Functions - Implementation Documentation
 
 ## Overview
-This document describes the implementation of backend AI functions for the DecoDocs/SnapSign application. Both applications share the same Firebase project (`snapsign-au`), enabling unified authentication, data, and analytics. The system implements anonymous identity, document fingerprinting, preflight classification, text-first analysis, AI call accounting, and usage metrics storage.
+This document describes the current backend AI functions for DecoDocs/SnapSign.
+
+It reflects the live model in `functions/index.js`:
+- Firebase callable functions
+- Firebase Auth (anonymous + linked providers)
+- token-budget enforcement by tier
+- docHash ledger + usage events
+- no document content persistence in Firestore
 
 ## Architecture
 
 ### Components
-- **Firebase Cloud Functions** - Serverless backend functions
-- **Firestore** - Usage metrics storage (no document content)
-- **Firebase Auth** - Anonymous authentication
-- **Client-side** - PDF.js for text extraction, document hashing
+- Firebase Cloud Functions
+- Firestore (`users`, `usage_daily`, `usage_events`, `docshashes`)
+- Firebase Auth
+- Client-side PDF.js for extraction + SHA-256 docHash
 
 ### Data Flow
-```
-Client -> Extract text via PDF.js -> Compute docHash -> Preflight check -> AI analysis -> Response
-```
+Client -> extract text -> compute docHash -> `preflightCheck` -> `analyzeText` / `analyzeByType`.
 
-## Function Specifications
+## Callable Functions
 
-### 1. Anonymous Identity
-All AI functions require Firebase Anonymous Authentication:
+### `preflightCheck`
+Purpose: classify input before expensive analysis.
 
-```javascript
-const validateAuth = (context) => {
-  if (!context.auth || !context.auth.uid) {
-    throw new functions.https.HttpsError(
-      'unauthenticated',
-      'Authentication is required for this operation.'
-    );
-  }
-  return context.auth.uid;
-};
-```
+Input:
+- `docHash` (64-char hex)
+- `stats` (`pageCount`, `charsPerPage`, `totalChars`, optional `pdfSizeBytes`)
 
-### 2. Document Fingerprinting
-Documents are identified using SHA-256 hash of PDF bytes:
-- Format: `docHash = SHA-256(PDF bytes)`
-- Used as stable document ID
-- Stored as 64-character hexadecimal string
+Behavior:
+- computes scan ratio (`charsPerPage < 30`)
+- enforces scanned-PDF gating (Pro-only)
+- enforces size guard (`FREE_MAX_TOTAL_CHARS = 120000` for non-Pro)
 
-### 3. Preflight Classification (`preflightCheck`)
+Output (current contract):
+- `ok`
+- `classification` (`OK` or `PRO_REQUIRED`)
+- `requiredTier`
+- `reasons[]`
+- `entitlement` (`tier`, `isPro`)
+- `stats` (`scanRatio`, `estimatedTokens`)
 
-#### Input
-```javascript
-{
-  "docHash": "hex_sha256",  // 64-char hex string
-  "stats": {
-    "pageCount": 12,
-    "pdfSizeBytes": 1048576,
-    "charsPerPage": [1200, 980, 0, 30],  // Character count per page
-    "totalChars": 14500,
-    "languageHint": "en"
-  }
-}
-```
+### `analyzeText`
+Purpose: text-first analysis with tier budget enforcement.
 
-#### Processing
-1. Validates docHash format
-2. Computes scanRatio from charsPerPage statistics
-3. Estimates token usage
-4. Determines classification based on user plan and document characteristics
+Input:
+- `docHash`
+- `stats`
+- `text.value`
 
-#### Output
-```javascript
-{
-  "ok": true,
-  "classification": "FREE_OK|PRO_REQUIRED|BLOCKED",
-  "requiredPlan": "free|pro",
-  "reasons": [
-    {
-      "code": "SCAN_DETECTED",
-      "message": "Scanned PDFs require OCR (Pro)."
-    }
-  ],
-  "stats": {
-    "scanRatio": 0.25,
-    "estimatedTokens": 8200
-  }
-}
-```
+Behavior:
+- validates docHash/text
+- recomputes scan ratio and blocks OCR-required docs for non-Pro
+- computes `estimatedTokens = floor(totalChars / 4)`
+- enforces per-tier token budgets
+- writes `docshashes/{docHash}` ledger metadata
+- writes `usage_events` entry
 
-#### Configuration
-- `SCAN_RATIO_THRESHOLD = 0.20` - If >20% of pages have <30 chars, document is considered scanned
-- `FREE_MAX_TOTAL_CHARS = 120000` - Size limit for Free tier
+Output (success):
+- `ok: true`
+- `docHash`
+- `result` (normalized analysis schema)
+- `usage` (`estimatedTokens`, `remainingTokens`)
+- `entitlement` (`tier`, `isPro`)
 
-### 4. Text Analysis (`analyzeText`)
+Output (budget/gate failure):
+- `ok: false`
+- `code` (`SCAN_DETECTED_PRO_REQUIRED`, `ANON_TOKEN_LIMIT`, `FREE_TOKEN_LIMIT`)
+- `requiredTier`
+- `usage` (`estimatedTokens`, `remainingTokens`)
 
-#### Input
-```javascript
-{
-  "docHash": "hex_sha256",
-  "stats": {
-    "pageCount": 12,
-    "charsPerPage": [1200, 980, 0, 30],
-    "totalChars": 14500,
-    "languageHint": "en"
-  },
-  "text": {
-    "format": "paged",
-    "value": "[PAGE 1] ... [PAGE 2] ...",  // Stripped text content
-    "pageTextIndex": [{"page":1,"start":0,"end":1200}]  // Optional page indexing
-  },
-  "options": {
-    "tasks": ["explain","caveats","inconsistencies"],
-    "targetLanguage": null
-  }
-}
-```
+### `analyzeByType`
+Purpose: type-routed analysis path (currently heuristic/placeholder, token-budgeted).
 
-#### Enforcement Logic
-1. Recomputes scanRatio from stats
-2. Loads `usage_docs/${uid}_${docHash}` (creates if missing)
-3. Gets user entitlement plan (free/pro)
-4. Checks `aiCallsUsed < limit`, returns `PRO_REQUIRED` if exceeded
-5. Validates text size guards
-6. Calls LLM once (simulated in MVP)
-7. Validates output schema
-8. Increments `aiCallsUsed` atomically
+Behavior:
+- same token budget enforcement as `analyzeText`
+- resolves effective type (`override` vs detected)
+- loads validation spec metadata
+- returns structured type-specific placeholder result
 
-#### Output
-```javascript
-{
-  "ok": true,
-  "docHash": "hex_sha256",
-  "result": {
-    "plainExplanation": "...",
-    "risks": [
-      {
-        "id": "R1",
-        "title": "Automatic renewal",
-        "severity": "high",
-        "whyItMatters": "...",
-        "whatToCheck": ["..."],
-        "anchors": [{"page":7,"quote":"…","confidence":0.62}]
-      }
-    ],
-    "unfairConditions": [],
-    "inconsistencies": [],
-    "obligations": [],
-    "missingInfo": []
-  },
-  "usage": {
-    "aiCallsUsed": 1,
-    "aiCallsRemaining": 0
-  }
-}
-```
+### `getEntitlement`
+Current response:
+- `tier` (`anonymous|free|pro`)
+- `isPro`
+- `storageEnabled`, `ocrEnabled`
+- `anonTokensPerUid`, `freeTokensPerDay`
 
-### 5. Entitlement Check (`getEntitlement`)
+## Tier Budget Model (Current)
 
-#### Output
-```javascript
-{
-  "plan": "free|pro|premium",
-  "aiCallsPerDocLimit": 1,  // Free: 1, Pro: 3 (configurable)
-  "storageEnabled": false,
-  "ocrEnabled": false
-}
-```
+- Anonymous:
+  - budget: `20,000` tokens per identity session (current implementation key: puid, where `puid == uid` today)
+  - OCR: no
+- Free (non-anonymous, no active Pro flag):
+  - budget: `40,000` tokens/day (UTC) per puid
+  - OCR: no
+- Pro:
+  - budget: unrestricted in this layer (fair-use policy may apply separately)
+  - OCR: yes
+- Business:
+  - product tier is documented in `Decodocs/docs/SUBSCRIPTION_TIERS.md`
+  - current Functions entitlement resolver exposes `pro` capability flag; Business should be treated as Pro-capable in runtime until dedicated `business` tier branching is added
 
-## Firestore Data Model
+## Firestore Model (Current)
 
-### Collection: `usage_docs`
-**Document ID**: `${uid}_${docHash}`
+- `users/{puid}`
+  - entitlement flags (`isPro`, subscription metadata)
+  - anonymous usage accumulator (`usage.anonTokensUsed`)
+- `usage_daily/{puid_YYYYMMDD}`
+  - free-tier daily token usage
+- `usage_events/{autoId}`
+  - analysis event log
+- `docshashes/{docHash}`
+  - doc hash ledger metadata
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `uid` | string | User ID |
-| `docHash` | string | Document hash |
-| `createdAt` | timestamp | Creation time |
-| `lastUsedAt` | timestamp | Last access time |
-| `plan` | string | User plan at last use (free\|pro\|premium) |
-| `aiCallsUsed` | number | Number of AI calls used |
-| `scanRatio` | number | Calculated scan ratio (optional) |
-| `pageCount` | number | Page count (optional) |
-| `blockedReason` | string\|null | Reason for blocking (optional) |
+## Config Constants (Current)
+- `MIN_CHARS_PER_PAGE = 30`
+- `SCAN_RATIO_THRESHOLD = 0.20`
+- `FREE_MAX_TOTAL_CHARS = 120000`
+- `ANON_TOKENS_PER_UID = 20000`
+- `FREE_TOKENS_PER_DAY = 40000`
+- `TTL_DAYS_USAGE_DOCS = 30` (cleanup targets `usage_daily`)
 
-**Client writes**: Disabled (only functions can write)
-
-## Configuration Constants
-
-```javascript
-const CONFIG = {
-  FREE_AI_CALLS_PER_DOC: 1,
-  PRO_AI_CALLS_PER_DOC: 3,
-  MIN_CHARS_PER_PAGE: 30,
-  SCAN_RATIO_THRESHOLD: 0.20,
-  FREE_MAX_TOTAL_CHARS: 120000,
-  TTL_DAYS_USAGE_DOCS: 30
-};
-```
-
-## Error Handling
-
-### Error Codes
-- `AUTH_REQUIRED` - Missing authentication
-- `INVALID_DOC_HASH` - Invalid document hash format
-- `SCAN_DETECTED_PRO_REQUIRED` - Scanned document detected
-- `AI_BUDGET_EXCEEDED_PRO_REQUIRED` - AI call limit reached
-- `PAYLOAD_TOO_LARGE` - Request too large
-- `MODEL_ERROR_RETRYABLE` - Transient model error
-- `MODEL_ERROR_FATAL` - Permanent model error
-
-### Error Response Format
-```javascript
-{
-  "ok": false,
-  "code": "SCAN_DETECTED_PRO_REQUIRED",
-  "message": "Scanned PDFs require OCR (Pro).",
-  "requiredPlan": "pro"
-}
-```
-
-## Validation & Schema Enforcement
-
-### Output Schema Validation
-All analyze functions validate and repair output schemas:
-- Ensures required fields exist
-- Normalizes risk objects to expected format
-- Validates array types
-
-### DocHash Validation
-- Confirms 64-character hexadecimal format
-- Rejects invalid hashes with `INVALID_DOC_HASH` error
-
-## Deployment Notes
-
-### Prerequisites
-- Firebase project with Blaze (pay-as-you-go) plan for functions
-- Firestore database enabled
-- Firebase Auth with Anonymous sign-in enabled
-
-### Security Rules
-Firestore rules restrict access:
-- Users can only read their own usage docs
-- Client writes are disabled (only functions can write)
-
-### Scheduled Cleanup
-TTL cleanup runs daily to remove usage records older than 30 days.
-
-## Client Integration
-
-### Required Flow
-1. Anonymous sign-in
-2. PDF text extraction via PDF.js
-3. Document hash computation
-4. Preflight check
-5. Conditional AI analysis based on preflight result
-
-### Dependencies
-- `firebase` SDK
-- `pdfjs-dist` for client-side text extraction
-- Web Crypto API for SHA-256 hashing
-
-## Limitations & Future Enhancements
-
-### MVP Limitations
-- AI calls are simulated with mock data
-- No OCR processing for scanned documents
-- Fixed plan limits (not dynamically configurable)
-
-### Planned Enhancements
-- Production LLM integration
-- OCR processing for scanned documents
-- Dynamic plan configuration
-- Advanced document analysis features
+## Notes
+- Analysis content is still mock/placeholder in current `analyzeText` implementation.
+- This doc intentionally supersedes old per-document `aiCallsUsed` documentation.

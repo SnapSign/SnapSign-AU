@@ -11,19 +11,17 @@ const geminiClient = require('../lib/gemini-client');
 
 describe('AI Analysis Functions', () => {
     let myFunctions;
-    let adminInitStub;
-    let geminiStub;
-    let modelStub;
+    // Load functions
+    console.log('Current directory:', process.cwd());
+    try {
+        // Clear firebase-admin from cache to ensure we mock the one index.js uses
+        const adminPath = require.resolve('firebase-admin');
+        delete require.cache[adminPath];
+        // Re-require admin to stub it freshly
+        const admin = require('firebase-admin');
 
-    before(() => {
-        // Initialize a mock app so admin.firestore() doesn't fail
-        if (admin.apps.length === 0) {
-            admin.initializeApp({ projectId: 'test-project' });
-        }
-        // adminInitStub = sinon.stub(admin, 'initializeApp'); // No longer needed
-
-
-        // Mock Firestore calls
+        // Re-apply stubs to this fresh instance
+        adminInitStub = sinon.stub(admin, 'initializeApp');
         const firestoreStub = sinon.stub(admin, 'firestore').returns({
             collection: sinon.stub().returns({
                 doc: sinon.stub().returns({
@@ -36,26 +34,16 @@ describe('AI Analysis Functions', () => {
             runTransaction: sinon.stub().resolves()
         });
 
-        // Mock Gemini client
-        modelStub = {
-            generateContent: sinon.stub()
-        };
-        geminiStub = sinon.stub(geminiClient, 'getGeminiModel').returns(modelStub);
+        console.log('Requiring ../index');
+        const indexPath = require.resolve('../index');
+        delete require.cache[indexPath];
+        myFunctions = require('../index');
+        console.log('Loaded ../index');
+    } catch (e) {
+        console.error('Error requiring ../index:', e);
+        throw e;
+    }
 
-
-        // Load functions
-        console.log('Current directory:', process.cwd());
-        try {
-            console.log('Requiring ../index');
-            const indexPath = require.resolve('../index');
-            delete require.cache[indexPath];
-            myFunctions = require('../index');
-            console.log('Loaded ../index');
-        } catch (e) {
-            console.error('Error requiring ../index:', e);
-            throw e;
-        }
-    });
 
     after(() => {
         test.cleanup();

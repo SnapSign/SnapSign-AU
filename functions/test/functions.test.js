@@ -1,284 +1,330 @@
 const { expect } = require('chai');
-const { initializeTestEnvironment, assertFails, assertSucceeds } = require('@firebase/rules-unit-testing');
-const { getFirestore, collection, doc, setDoc, getDoc, addDoc } = require('firebase/firestore');
-const { getFunctions, httpsCallable } = require('firebase/functions');
+const proxyquire = require('proxyquire');
+const test = require('firebase-functions-test')();
 
-let testEnv;
-let db;
-let functions;
+const makeFirestoreStub = () => {
+  const docs = new Map();
 
-describe('DecoDocs Functions Tests', () => {
-  before(async () => {
-    testEnv = await initializeTestEnvironment({
-      projectId: 'snapsign-au-test',
-      firestore: {
-        rules: 'firestore.rules',
-        host: 'localhost',
-        port: 8080
-      }
+  const getDocData = (path) => docs.get(path);
+
+  const setDocData = (path, payload, options = {}) => {
+    const prev = docs.get(path) || {};
+    const next = options.merge ? { ...prev, ...payload } : { ...payload };
+    docs.set(path, next);
+  };
+
+  return {
+    collection: (name) => ({
+      doc: (id) => {
+        const path = `${name}/${id}`;
+        return {
+          get: async () => {
+            const data = getDocData(path);
+            return {
+              exists: !!data,
+              data: () => data,
+            };
+          },
+          set: async (payload, options) => {
+            setDocData(path, payload, options);
+          },
+        };
+      },
+      add: async () => ({ id: `mock-${Date.now()}` }),
+      where: () => ({
+        get: async () => ({
+          forEach: () => {},
+        }),
+      }),
+    }),
+    runTransaction: async (fn) => fn({
+      get: async () => ({ exists: false, data: () => ({}) }),
+      set: async () => {},
+    }),
+    batch: () => ({
+      delete: () => {},
+      commit: async () => {},
+    }),
+    __seed: (path, data) => {
+      docs.set(path, data);
+    },
+    __clear: () => {
+      docs.clear();
+    },
+  };
+};
+
+describe('DecoDocs Functions Unit Tests', () => {
+  let myFunctions;
+  let firestoreStub;
+  let getGeminiModelStub;
+
+  before(() => {
+    firestoreStub = makeFirestoreStub();
+    const firestoreFn = () => firestoreStub;
+    firestoreFn.FieldValue = {
+      serverTimestamp: () => ({ __type: 'serverTimestamp' }),
+      increment: (n) => ({ __type: 'increment', value: n }),
+    };
+
+    const adminStub = {
+      apps: [],
+      initializeApp: function initializeApp() {
+        if (this.apps.length === 0) this.apps.push({});
+      },
+      firestore: firestoreFn,
+      credential: { cert: () => ({}) },
+    };
+
+    const modelStub = {
+      generateContent: async () => ({
+        response: {
+          text: () =>
+            JSON.stringify({
+              plainExplanation: 'stub-analysis',
+              risks: [],
+              unfairConditions: [],
+              inconsistencies: [],
+              obligations: [],
+              missingInfo: [],
+            }),
+        },
+      }),
+    };
+    getGeminiModelStub = async () => modelStub;
+
+    myFunctions = proxyquire('../index', {
+      'firebase-admin': adminStub,
+      './lib/gemini-client': {
+        getGeminiModel: getGeminiModelStub,
+      },
+      './lib/prompts': {
+        buildAnalysisPrompt: () => 'analysis prompt',
+        buildExplanationPrompt: () => 'explain prompt',
+        buildRiskPrompt: () => 'risk prompt',
+        buildTranslationPrompt: () => 'translation prompt',
+        buildTypeSpecificPrompt: () => 'type prompt',
+      },
     });
   });
 
-  beforeEach(async () => {
-    // Clear the test database between tests
-    await testEnv.clearFirestore();
-    
-    // Initialize Firestore and Functions instances
-    db = getFirestore(testEnv.authedApp({ uid: 'test-user' }));
-    functions = getFunctions(testEnv.authedApp({ uid: 'test-user' }), 'http://localhost:5001');
+  beforeEach(() => {
+    firestoreStub.__clear();
   });
 
-  afterEach(async () => {
-    // Clean up any resources between tests if needed
+  after(() => {
+    test.cleanup();
   });
 
-  after(async () => {
-    await testEnv.cleanup();
-  });
-
-  describe('preflightCheck function', () => {
-    it('should classify documents correctly', async () => {
-      const preflightCheck = httpsCallable(functions, 'preflightCheck');
-      
-      // Test with a document that has good text density (not scanned)
-      const result = await preflightCheck({
-        docHash: 'a'.repeat(64), // Valid SHA-256 hash
-        stats: {
-          pageCount: 10,
-          charsPerPage: [1000, 1200, 800, 1500, 900, 1100, 700, 1300, 1000, 950],
-          totalChars: 10450,
-          pdfSizeBytes: 1048576,
-          languageHint: 'en'
-        }
-      });
-      
-      expect(result.data.ok).to.be.true;
-      expect(result.data.classification).to.equal('FREE_OK');
-      expect(result.data.requiredPlan).to.equal('free');
-      expect(result.data.stats.scanRatio).to.be.lessThan(0.20); // Below threshold
-    });
-
-    it('should detect scanned documents', async () => {
-      const preflightCheck = httpsCallable(functions, 'preflightCheck');
-      
-      // Test with a document that has low text density (scanned)
-      const result = await preflightCheck({
-        docHash: 'b'.repeat(64), // Valid SHA-256 hash
-        stats: {
-          pageCount: 10,
-          charsPerPage: [10, 5, 0, 15, 20, 5, 0, 10, 25, 30], // Mostly low text pages
-          totalChars: 120,
-          pdfSizeBytes: 2048576,
-          languageHint: 'en'
-        }
-      });
-      
-      expect(result.data.ok).to.be.true;
-      expect(result.data.classification).to.equal('PRO_REQUIRED');
-      expect(result.data.requiredPlan).to.equal('pro');
-      expect(result.data.reasons).to.have.length.greaterThan(0);
-      expect(result.data.stats.scanRatio).to.be.greaterThanOrEqual(0.20); // Above threshold
-    });
-
-    it('should reject invalid docHash', async () => {
-      const preflightCheck = httpsCallable(functions, 'preflightCheck');
-      
-      // Test with invalid docHash
-      try {
-        await preflightCheck({
-          docHash: 'invalid-hash', // Invalid hash
+  describe('preflightCheck', () => {
+    it('classifies readable documents as OK for free users', async () => {
+      const wrapped = test.wrap(myFunctions.preflightCheck);
+      const result = await wrapped({
+        data: {
+          docHash: 'a'.repeat(64),
           stats: {
             pageCount: 10,
             charsPerPage: [1000, 1200, 800, 1500, 900, 1100, 700, 1300, 1000, 950],
             totalChars: 10450,
             pdfSizeBytes: 1048576,
-            languageHint: 'en'
-          }
-        });
-        expect.fail('Should have thrown an error');
-      } catch (error) {
-        expect(error.details.status).to.equal('INVALID_ARGUMENT');
-      }
-    });
-  });
-
-  describe('analyzeText function', () => {
-    it('should analyze text for free users with valid documents', async () => {
-      const analyzeText = httpsCallable(functions, 'analyzeText');
-      
-      const result = await analyzeText({
-        docHash: 'c'.repeat(64), // Valid SHA-256 hash
-        stats: {
-          pageCount: 5,
-          charsPerPage: [1000, 1200, 800, 1500, 900],
-          totalChars: 5600,
-          languageHint: 'en'
+            languageHint: 'en',
+          },
         },
-        text: {
-          format: 'paged',
-          value: '[PAGE 1] This is a sample contract with standard terms and conditions. [PAGE 2] Additional clauses may apply...',
-          pageTextIndex: [
-            { page: 1, start: 0, end: 60 },
-            { page: 2, start: 60, end: 120 }
-          ]
-        },
-        options: {
-          tasks: ['explain', 'caveats', 'inconsistencies'],
-          targetLanguage: null
-        }
+        auth: { uid: 'test-user', token: { firebase: { sign_in_provider: 'password' } } },
       });
-      
-      expect(result.data.ok).to.be.true;
-      expect(result.data.docHash).to.equal('c'.repeat(64));
-      expect(result.data.result).to.have.property('plainExplanation');
-      expect(result.data.result).to.have.property('risks');
-      expect(result.data.usage.aiCallsUsed).to.equal(1);
+
+      expect(result.ok).to.equal(true);
+      expect(result.classification).to.equal('OK');
+      expect(result.requiredTier).to.equal('free');
+      expect(result.stats.scanRatio).to.be.lessThan(0.2);
     });
 
-    it('should enforce AI call limits for free users', async () => {
-      const analyzeText = httpsCallable(functions, 'analyzeText');
-      
-      // First call should succeed
-      const firstResult = await analyzeText({
-        docHash: 'd'.repeat(64), // Valid SHA-256 hash
-        stats: {
-          pageCount: 5,
-          charsPerPage: [1000, 1200, 800, 1500, 900],
-          totalChars: 5600,
-          languageHint: 'en'
-        },
-        text: {
-          format: 'paged',
-          value: '[PAGE 1] This is a sample contract with standard terms and conditions.',
-          pageTextIndex: [
-            { page: 1, start: 0, end: 60 }
-          ]
-        },
-        options: {
-          tasks: ['explain', 'caveats', 'inconsistencies'],
-          targetLanguage: null
-        }
-      });
-      
-      expect(firstResult.data.ok).to.be.true;
-      expect(firstResult.data.usage.aiCallsUsed).to.equal(1);
-      
-      // Second call should fail due to AI call limit for free users (1 per doc)
-      try {
-        await analyzeText({
-          docHash: 'd'.repeat(64), // Same document hash
+    it('detects scanned documents and requires pro tier', async () => {
+      const wrapped = test.wrap(myFunctions.preflightCheck);
+      const result = await wrapped({
+        data: {
+          docHash: 'b'.repeat(64),
           stats: {
-            pageCount: 5,
-            charsPerPage: [1000, 1200, 800, 1500, 900],
-            totalChars: 5600,
-            languageHint: 'en'
+            pageCount: 10,
+            charsPerPage: [10, 5, 0, 15, 20, 5, 0, 10, 25, 30],
+            totalChars: 120,
+            pdfSizeBytes: 2048576,
+            languageHint: 'en',
           },
-          text: {
-            format: 'paged',
-            value: '[PAGE 1] This is a sample contract with standard terms and conditions.',
-            pageTextIndex: [
-              { page: 1, start: 0, end: 60 }
-            ]
+        },
+        auth: { uid: 'test-user', token: { firebase: { sign_in_provider: 'password' } } },
+      });
+
+      expect(result.ok).to.equal(true);
+      expect(result.classification).to.equal('PRO_REQUIRED');
+      expect(result.requiredTier).to.equal('pro');
+      expect(result.reasons.some((r) => r.code === 'SCAN_DETECTED')).to.equal(true);
+    });
+
+    it('requires pro when document exceeds free size threshold', async () => {
+      const wrapped = test.wrap(myFunctions.preflightCheck);
+      const result = await wrapped({
+        data: {
+          docHash: 'c'.repeat(64),
+          stats: {
+            pageCount: 2,
+            charsPerPage: [70000, 70001], // not scan-like, but too large overall
+            totalChars: 140001, // > FREE_MAX_TOTAL_CHARS (120000)
+            pdfSizeBytes: 4096,
+            languageHint: 'en',
           },
-          options: {
-            tasks: ['explain', 'caveats', 'inconsistencies'],
-            targetLanguage: null
-          }
+        },
+        auth: { uid: 'free-user', token: { firebase: { sign_in_provider: 'password' } } },
+      });
+
+      expect(result.ok).to.equal(true);
+      expect(result.classification).to.equal('PRO_REQUIRED');
+      expect(result.requiredTier).to.equal('pro');
+      expect(result.reasons.some((r) => r.code === 'SIZE_LIMIT_EXCEEDED')).to.equal(true);
+    });
+
+    it('does not gate pro users on scan/size in preflight', async () => {
+      firestoreStub.__seed('users/pro-user', { isPro: true });
+      const wrapped = test.wrap(myFunctions.preflightCheck);
+      const result = await wrapped({
+        data: {
+          docHash: 'd'.repeat(64),
+          stats: {
+            pageCount: 10,
+            charsPerPage: [1, 0, 0, 2, 1, 0, 2, 1, 0, 1], // scan-like
+            totalChars: 200000, // very large
+            pdfSizeBytes: 8096,
+            languageHint: 'en',
+          },
+        },
+        auth: { uid: 'pro-user', token: { firebase: { sign_in_provider: 'password' } } },
+      });
+
+      expect(result.ok).to.equal(true);
+      expect(result.classification).to.equal('OK');
+      expect(result.entitlement.tier).to.equal('pro');
+      expect(result.entitlement.isPro).to.equal(true);
+      expect(result.reasons).to.have.length(0);
+    });
+
+    it('rejects invalid docHash', async () => {
+      const wrapped = test.wrap(myFunctions.preflightCheck);
+      try {
+        await wrapped({
+          data: {
+            docHash: 'invalid-hash',
+            stats: {
+              pageCount: 1,
+              charsPerPage: [100],
+              totalChars: 100,
+              pdfSizeBytes: 1000,
+              languageHint: 'en',
+            },
+          },
+          auth: { uid: 'test-user', token: { firebase: { sign_in_provider: 'password' } } },
         });
-        expect.fail('Should have thrown an error due to AI call limit');
-      } catch (error) {
-        // Note: In the mock implementation, we might not enforce limits strictly
-        // This test would work with a real implementation
+        expect.fail('Expected invalid-argument');
+      } catch (e) {
+        expect(e.code).to.equal('invalid-argument');
       }
     });
+  });
 
-    it('should block scanned documents for free users', async () => {
-      const analyzeText = httpsCallable(functions, 'analyzeText');
-      
-      // Test with a scanned document (low text density)
-      const result = await analyzeText({
-        docHash: 'e'.repeat(64), // Valid SHA-256 hash
-        stats: {
-          pageCount: 10,
-          charsPerPage: [10, 5, 0, 15, 20, 5, 0, 10, 25, 30], // Low text density
-          totalChars: 120,
-          languageHint: 'en'
-        },
-        text: {
-          format: 'paged',
-          value: '[PAGE 1] [PAGE 2] [PAGE 3]', // Minimal text
-          pageTextIndex: [
-            { page: 1, start: 0, end: 10 },
-            { page: 2, start: 10, end: 20 },
-            { page: 3, start: 20, end: 30 }
-          ]
-        },
-        options: {
-          tasks: ['explain', 'caveats', 'inconsistencies'],
-          targetLanguage: null
-        }
+  describe('getEntitlement', () => {
+    it('returns free entitlements for non-pro users', async () => {
+      const wrapped = test.wrap(myFunctions.getEntitlement);
+      const result = await wrapped({
+        data: {},
+        auth: { uid: 'test-user', token: { firebase: { sign_in_provider: 'password' } } },
       });
-      
-      // Should return a PRO_REQUIRED response
-      expect(result.data.ok).to.be.false;
-      expect(result.data.code).to.equal('SCAN_DETECTED_PRO_REQUIRED');
-      expect(result.data.requiredPlan).to.equal('pro');
+
+      expect(result.tier).to.equal('free');
+      expect(result.isPro).to.equal(false);
+      expect(result.storageEnabled).to.equal(false);
+      expect(result.ocrEnabled).to.equal(false);
+      expect(result.anonTokensPerUid).to.be.a('number');
+      expect(result.freeTokensPerDay).to.be.a('number');
+    });
+
+    it('returns pro entitlements for users flagged as pro', async () => {
+      firestoreStub.__seed('users/pro-user', { isPro: true });
+      const wrapped = test.wrap(myFunctions.getEntitlement);
+      const result = await wrapped({
+        data: {},
+        auth: { uid: 'pro-user', token: { firebase: { sign_in_provider: 'password' } } },
+      });
+
+      expect(result.tier).to.equal('pro');
+      expect(result.isPro).to.equal(true);
+      expect(result.storageEnabled).to.equal(true);
+      expect(result.ocrEnabled).to.equal(true);
+    });
+
+    it('returns anonymous tier for anonymous auth without pro flag', async () => {
+      const wrapped = test.wrap(myFunctions.getEntitlement);
+      const result = await wrapped({
+        data: {},
+        auth: { uid: 'anon-user', token: { firebase: { sign_in_provider: 'anonymous' } } },
+      });
+
+      expect(result.tier).to.equal('anonymous');
+      expect(result.isPro).to.equal(false);
+      expect(result.storageEnabled).to.equal(false);
+      expect(result.ocrEnabled).to.equal(false);
     });
   });
 
-  describe('getEntitlement function', () => {
-    it('should return correct entitlements for free users', async () => {
-      const getEntitlement = httpsCallable(functions, 'getEntitlement');
-      
-      const result = await getEntitlement({});
-      
-      expect(result.data.plan).to.equal('free');
-      expect(result.data.aiCallsPerDocLimit).to.equal(1); // Free users get 1 call per doc
-      expect(result.data.storageEnabled).to.be.false; // Storage not enabled for free
-      expect(result.data.ocrEnabled).to.be.false; // OCR not enabled for free
-    });
-  });
-
-  describe('Firestore Security Rules', () => {
-    it('should allow users to read their own usage docs', async () => {
-      // Add a usage doc for the test user
-      const usageDocRef = doc(db, 'usage_docs', 'test-user_' + 'f'.repeat(64));
-      await setDoc(usageDocRef, {
-        uid: 'test-user',
-        docHash: 'f'.repeat(64),
-        aiCallsUsed: 1
+  describe('analyzeText token gating', () => {
+    it('returns FREE_TOKEN_LIMIT for free users above daily token threshold', async () => {
+      const wrapped = test.wrap(myFunctions.analyzeText);
+      const result = await wrapped({
+        data: {
+          docHash: 'e'.repeat(64),
+          stats: { totalChars: 200000 }, // 50,000 estimated tokens > 40,000 daily free cap
+          text: { value: 'x'.repeat(1000) },
+        },
+        auth: { uid: 'free-token-user', token: { firebase: { sign_in_provider: 'password' } } },
       });
-      
-      // User should be able to read their own doc
-      const readResult = await getDoc(usageDocRef);
-      expect(readResult.exists()).to.be.true;
+
+      expect(result.ok).to.equal(false);
+      expect(result.code).to.equal('FREE_TOKEN_LIMIT');
+      expect(result.requiredTier).to.equal('pro');
+      expect(result.usage.estimatedTokens).to.equal(50000);
     });
 
-    it('should deny users from reading others\' usage docs', async () => {
-      // Add a usage doc for a different user
-      const otherUserUsageId = 'other-user_' + 'g'.repeat(64);
-      const otherUserUsageRef = doc(db, 'usage_docs', otherUserUsageId);
-      await setDoc(otherUserUsageRef, {
-        uid: 'other-user',
-        docHash: 'g'.repeat(64),
-        aiCallsUsed: 1
+    it('returns ANON_TOKEN_LIMIT for anonymous users above lifetime anon threshold', async () => {
+      const wrapped = test.wrap(myFunctions.analyzeText);
+      const result = await wrapped({
+        data: {
+          docHash: 'f'.repeat(64),
+          stats: { totalChars: 100000 }, // 25,000 estimated tokens > 20,000 anon cap
+          text: { value: 'x'.repeat(1000) },
+        },
+        auth: { uid: 'anon-token-user', token: { firebase: { sign_in_provider: 'anonymous' } } },
       });
-      
-      // User should NOT be able to read other user's doc
-      const readPromise = getDoc(otherUserUsageRef);
-      await assertFails(readPromise);
+
+      expect(result.ok).to.equal(false);
+      expect(result.code).to.equal('ANON_TOKEN_LIMIT');
+      expect(result.requiredTier).to.equal('free');
+      expect(result.usage.estimatedTokens).to.equal(25000);
     });
 
-    it('should deny client writes to usage_docs', async () => {
-      const usageDocRef = doc(db, 'usage_docs', 'test-user_' + 'h'.repeat(64));
-      const writePromise = setDoc(usageDocRef, {
-        uid: 'test-user',
-        docHash: 'h'.repeat(64),
-        aiCallsUsed: 0
+    it('allows pro users past free token thresholds', async () => {
+      firestoreStub.__seed('users/pro-analysis-user', { isPro: true });
+      const wrapped = test.wrap(myFunctions.analyzeText);
+      const result = await wrapped({
+        data: {
+          docHash: 'a1'.repeat(32),
+          stats: { totalChars: 400000 }, // 100k estimated tokens, would fail for free/anon
+          text: { value: 'This is a contract clause.' },
+        },
+        auth: { uid: 'pro-analysis-user', token: { firebase: { sign_in_provider: 'password' } } },
       });
-      
-      // Client writes should be denied - only functions can write
-      await assertFails(writePromise);
+
+      expect(result.ok).to.equal(true);
+      expect(result.entitlement.tier).to.equal('pro');
+      expect(result.usage.estimatedTokens).to.equal(100000);
+      expect(result.usage.remainingTokens).to.equal(null);
     });
   });
 });

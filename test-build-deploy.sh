@@ -16,6 +16,7 @@ DECO_ADMIN_OUT="$DECO_ADMIN_DIR/dist"
 
 SKIP_INSTALL=0
 SKIP_BUILD=0
+SKIP_TESTS=0
 SKIP_DEPLOY=0
 PROJECT_ID=""
 FIREBASE_ONLY="functions,hosting,firestore"
@@ -25,11 +26,12 @@ usage() {
   cat <<USAGE
 Usage: $(basename "$0") [options]
 
-Builds all dependent subprojects and deploys via Firebase from repo root.
+Runs tests, builds all dependent subprojects, and deploys via Firebase from repo root.
 
 Options:
   --skip-install         Skip npm dependency installation
   --skip-build           Skip npm build steps
+  --skip-tests           Skip unit/e2e test steps
   --skip-deploy          Skip Firebase deploy step
   --bump <type>          Bump version in all project package.json files (patch|minor|major)
   --project <projectId>  Firebase project id override (default from .firebaserc)
@@ -37,12 +39,13 @@ Options:
   -h, --help             Show this help
 
 Examples:
-  ./build-and-deploy.sh
-  ./build-and-deploy.sh --bump patch
-  ./build-and-deploy.sh --bump minor --skip-install
-  ./build-and-deploy.sh --skip-install
-  ./build-and-deploy.sh --skip-deploy
-  ./build-and-deploy.sh --project snapsign-au
+  ./test-build-deploy.sh
+  ./test-build-deploy.sh --bump patch
+  ./test-build-deploy.sh --bump minor --skip-install
+  ./test-build-deploy.sh --skip-install
+  ./test-build-deploy.sh --skip-tests
+  ./test-build-deploy.sh --skip-deploy
+  ./test-build-deploy.sh --project snapsign-au
 USAGE
 }
 
@@ -156,6 +159,10 @@ while [[ $# -gt 0 ]]; do
       SKIP_BUILD=1
       shift
       ;;
+    --skip-tests)
+      SKIP_TESTS=1
+      shift
+      ;;
     --skip-deploy)
       SKIP_DEPLOY=1
       shift
@@ -238,6 +245,15 @@ if [[ "$SKIP_BUILD" -eq 0 ]]; then
   log "Build outputs verified"
 else
   log "Skipping build steps"
+fi
+
+if [[ "$SKIP_TESTS" -eq 0 ]]; then
+  run_npm_script "$FUNCTIONS_DIR" "test:unit"
+  run_npm_script "$DECO_WEB_DIR" "test:unit"
+  run_npm_script "$DECO_WEB_DIR" "test:e2e"
+  log "Test suite completed (including e2e)"
+else
+  log "Skipping test steps"
 fi
 
 if [[ "$SKIP_DEPLOY" -eq 0 ]]; then

@@ -268,24 +268,24 @@ User Action: Click "Analyze Document"
 functions/
 ├─ index.js
 │  ├─ ✅ analyzeText (line 317)
-│  │  └─ 🔴 Returns mock, needs Gemini
-│  ├─ 🟡 analyzeByType (line 1145)
-│  │  └─ 🟠 Partial Gemini, needs completion
-│  ├─ ❌ explainSelection (MISSING)
-│  ├─ ❌ highlightRisks (MISSING)
-│  ├─ ❌ translateToPlainEnglish (MISSING)
+│  │  └─ ✅ Gemini callable active
+│  ├─ 🟡 analyzeByType (line 1215)
+│  │  └─ 🟠 Gemini active; final hardening pending
+│  ├─ ✅ explainSelection
+│  ├─ ✅ highlightRisks
+│  ├─ ✅ translateToPlainEnglish
 │  └─ ✅ [Other functions: preflight, storage, etc.]
 ├─ lib/
 │  ├─ ✅ auth.js
 │  ├─ ✅ entitlement.js
 │  ├─ ✅ storage-access.js
 │  ├─ ✅ billing/
-│  ├─ ❌ gemini-client.js (NEEDS TO CREATE)
-│  ├─ ❌ prompts.js (NEEDS TO CREATE)
-│  └─ ❌ analysis-schema.js (NEEDS TO CREATE)
+│  ├─ ✅ gemini-client.js
+│  ├─ ✅ prompts.js
+│  └─ ✅ analysis-schema.js
 └─ test/
    ├─ ✅ [Existing tests]
-   └─ ❌ analyzeText.test.js (NEEDS TO CREATE)
+   └─ 🟡 analysis function coverage expansion in progress
 
 Decodocs/web/src/
 ├─ hooks/
@@ -293,25 +293,23 @@ Decodocs/web/src/
 │  │  ├─ ✅ handleAnalyzeDocument
 │  │  ├─ ✅ handleAnalyzeByType
 │  │  ⚠️ handleExplainSelection
-│  │  │  └─ 🔴 Hardcoded selection
+│  │  │  └─ 🔴 Response contract alignment needed (`ok` vs `success`)
 │  │  ⚠️ handleHighlightRisks
-│  │  │  └─ 🔴 No visualization
+│  │  │  └─ 🔴 Contract/field mapping alignment needed
 │  │  └─ ✅ handleTranslateToPlainEnglish
-│  └─ ❌ useTextSelection.js (NEEDS TO CREATE)
+│  └─ ✅ useTextSelection.js
 ├─ components/
 │  ├─ ✅ AnalysisToolbox.jsx
-│  │  └─ 🔴 4 buttons non-functional
+│  │  └─ 🔴 summary/improvements buttons still need dedicated wiring
 │  ├─ ✅ AnalysisSidebar.jsx
 │  ├─ ✅ DocumentViewer.jsx
 │  │  └─ 🔴 Risk badges not rendering
-│  └─ ❌ RiskHighlight.jsx (NEEDS TO CREATE)
+│  └─ ✅ [Current overlays rendered through PDF renderer hooks]
 └─ services/
    ├─ ✅ analyzeTextService.js
    ├─ ✅ typeAnalysisService.js
    ├─ ✅ preflightService.js
-   ├─ ❌ explainService.js (NEEDS TO CREATE)
-   ├─ ❌ risksService.js (NEEDS TO CREATE)
-   └─ ❌ translateService.js (NEEDS TO CREATE)
+   └─ 🟡 no dedicated explain/risk/translate service files yet (handled in hook)
 ```
 
 ---

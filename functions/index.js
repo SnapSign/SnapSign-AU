@@ -142,6 +142,7 @@ const enforceAndRecordTokenUsage = async ({ puid, tier, estimatedTokens }) => {
     const userRef = db.collection('users').doc(puid);
     const snap = await userRef.get();
     const used = snap.exists ? (snap.data()?.usage?.anonTokensUsed || 0) : 0;
+    console.log(`DEBUG: enforceAndRecordTokenUsage ANON: used=${used} estimated=${estimatedTokens} limit=${CONFIG.ANON_TOKENS_PER_UID}`);
 
     if (used + estimatedTokens > CONFIG.ANON_TOKENS_PER_UID) {
       return { allowed: false, code: 'ANON_TOKEN_LIMIT', remaining: Math.max(0, CONFIG.ANON_TOKENS_PER_UID - used) };
@@ -361,7 +362,7 @@ exports.analyzeText = functions.https.onCall(async ({ data, ...context }) => {
 
     // Use the stripped text for analysis
     const strippedText = text.value;
-    const model = getGeminiModel();
+    const model = await getGeminiModel();
     const prompt = buildAnalysisPrompt(strippedText, { documentType: options.documentType });
 
     // Call Gemini with structured output
@@ -414,6 +415,7 @@ exports.analyzeText = functions.https.onCall(async ({ data, ...context }) => {
 
   } catch (error) {
     console.error('Analyze text error:', error);
+    console.error('DEBUG: Original error detail:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     if (error instanceof functions.https.HttpsError) throw error;
     throw new functions.https.HttpsError('internal', 'An error occurred during text analysis.');
   }
@@ -428,18 +430,20 @@ exports.explainSelection = functions.https.onCall(async ({ data, ...context }) =
     if (!selection) throw new functions.https.HttpsError('invalid-argument', 'Selection text is required');
 
     // Estimate tokens (small for selection)
-    const estimatedTokens = Math.ceil(selection.length / 4) + 500; // +500 for context/prompt
+    const estimatedTokens = Math.ceil(selection.length / 4) + 500; //    // Enforce token budgets (per uid/puid) same as analyzeText.
+    console.log(`DEBUG: analyzeText calling enforce. tier=${entitlement.tier} puid=${entitlement.puid}`);
     const budget = await enforceAndRecordTokenUsage({
       puid: entitlement.puid,
       tier: entitlement.tier,
       estimatedTokens,
     });
+    console.log(`DEBUG: analyzeText budget result:`, JSON.stringify(budget));
 
     if (!budget.allowed) {
       throw new functions.https.HttpsError('resource-exhausted', 'Token limit reached');
     }
 
-    const model = getGeminiModel();
+    const model = await getGeminiModel();
     const prompt = buildExplanationPrompt(selection, documentContext);
 
     const result = await model.generateContent({
@@ -483,7 +487,7 @@ exports.highlightRisks = functions.https.onCall(async ({ data, ...context }) => 
       throw new functions.https.HttpsError('resource-exhausted', 'Token limit reached');
     }
 
-    const model = getGeminiModel();
+    const model = await getGeminiModel();
     const prompt = buildRiskPrompt(documentText, documentType);
 
     const result = await model.generateContent({
@@ -527,7 +531,7 @@ exports.translateToPlainEnglish = functions.https.onCall(async ({ data, ...conte
       throw new functions.https.HttpsError('resource-exhausted', 'Token limit reached');
     }
 
-    const model = getGeminiModel();
+    const model = await getGeminiModel();
     const prompt = buildTranslationPrompt(legalText);
 
     const result = await model.generateContent({
@@ -1282,7 +1286,7 @@ exports.analyzeByType = functions.https.onCall(async ({ data, ...context }) => {
   // Call Gemini for type-specific analysis
   let result;
   try {
-    const model = getGeminiModel();
+    const model = await getGeminiModel();
     const prompt = buildTypeSpecificPrompt(safeText, effectiveTypeId || 'document', validationSpec);
 
     const geminiResult = await model.generateContent({
@@ -1517,4 +1521,3 @@ exports.setDocByPath = functions.https.onRequest(async (req, res) => {
     return res.status(500).json({ error: 'Internal error' });
   }
 });
-

@@ -245,12 +245,12 @@ src/components/AnalysisToolbox.jsx      (Connect button handlers)
 
 - **Where's the Gemini API key?** → Firebase Functions config (set via `firebase functions:config:set`)
 - **How many tokens per document?** → Varies by size; estimate: 1000-3000 tokens per average contract
-- **What if Gemini fails?** → Fallback to basic analysis (currently returns mock, should return cached result)
+- **What if Gemini fails?** → Return structured error/fallback response and surface actionable UI guidance.
 - **Can I test without API key?** → Yes, use Firebase emulator + mock responses in tests
 - **How to optimize costs?** → Use caching, compression, and incremental analysis
 
 ---
 
-**Last Updated:** 2026-02-16  
+**Last Updated:** 2026-02-17  
 **Owner:** Development Team  
-**Status:** Ready to Start Implementation
+**Status:** Integration Alignment In Progress

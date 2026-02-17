@@ -31,3 +31,15 @@ Firebase Hosting targets in `firebase.json` and their public directories are:
 ---
 
 If a deployment ever requests Blaze/Cloud Build/Artifact Registry for basic static hosting, review firebase.json and eliminate non-static or SSR/Next.js features. Cloud Build and Artifact Registry must remain disabled unless absolutely necessary for a critical feature.
+
+## Admin config helpers and paths
+- `functions/index.js` exposes two admin/debug HTTP helpers:
+  - `getDocByPath` (read a Firestore document by `qpath`)
+  - `setDocByPath` (write a Firestore document by `qpath`, `admin/*` only)
+- These helpers operate on Firestore **document paths** (even segment count), not field paths.
+- Gemini API key source of truth in Firestore is:
+  - document: `admin/gemini`
+  - field: `key`
+  - logical field path notation: `/admin/gemini/key`
+- Example write payload:
+  - `POST /setDocByPath` with `{ "qpath": "admin/gemini", "data": { "key": "AIza..." } }`

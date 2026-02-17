@@ -50,8 +50,8 @@ The DecoDocs web app has **implemented backend AI callables**, but integration a
    - 🔴 Suggest Improvements (UI button only, no logic)
 
 3. **Data Processing**
-   - 🟡 Document type detection uses mock response
-   - 🟡 Risk classification incomplete
+   - 🟡 Document type detection currently uses heuristic classification (non-LLM)
+   - 🟡 Risk classification still needs frontend mapping normalization
    - 🟡 Text selection context extraction not optimized
 
 ---

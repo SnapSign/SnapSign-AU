@@ -48,7 +48,6 @@ if (admin.apps.length === 0) {
   initAdmin();
 }
 
-console.log('admin.firestore structure:', typeof admin.firestore, admin.firestore.name, admin.firestore.isSinonProxy ? 'MOCKED' : 'REAL');
 const db = admin.firestore();
 
 // Configuration constants

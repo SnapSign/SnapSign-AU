@@ -221,6 +221,7 @@ cat AI_ANALYSIS_QUICK_CHECKLIST.md
 - **AI Model:** Google Gemini 2.0 Flash (or Pro)
 - **Database:** Firestore
 - **Testing:** Vitest, Jest
+- **Prompt Engineering:** MDX Prompt Packs (see [functions/prompts/README.md](functions/prompts/README.md))
 
 ---
 

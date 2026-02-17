@@ -11,6 +11,7 @@ FUNCTIONS_DIR="$ROOT_DIR/functions"
 
 SNAPSIGN_OUT="$SNAPSIGN_DIR/dist"
 DOCS_OUT="$DOCS_DIR/.next"
+DOCS_SEARCH_OUT="$DOCS_DIR/public/pagefind"
 DECO_WEB_OUT="$DECO_WEB_DIR/decodocs.com"
 DECO_ADMIN_OUT="$DECO_ADMIN_DIR/dist"
 
@@ -239,6 +240,7 @@ if [[ "$SKIP_BUILD" -eq 0 ]]; then
 
   assert_output_exists "$SNAPSIGN_OUT"
   assert_output_exists "$DOCS_OUT"
+  assert_output_exists "$DOCS_SEARCH_OUT"
   assert_output_exists "$DECO_WEB_OUT"
   assert_output_exists "$DECO_ADMIN_OUT"
 
@@ -248,6 +250,8 @@ else
 fi
 
 if [[ "$SKIP_TESTS" -eq 0 ]]; then
+  run_npm_script "$DOCS_DIR" "lint"
+  run_npm_script "$DECO_ADMIN_DIR" "lint"
   run_npm_script "$FUNCTIONS_DIR" "test:unit"
   run_npm_script "$DECO_WEB_DIR" "test:unit"
   run_npm_script "$DECO_WEB_DIR" "test:e2e"

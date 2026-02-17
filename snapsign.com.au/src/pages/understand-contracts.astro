@@ -1,10 +1,11 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import SiteHeader from "../components/SiteHeader.astro";
+import FeedbackCTA from "../components/FeedbackCTA.astro";
 
 const title = "Understand Your Contract Before You Sign | DecoDocs";
 const description =
-  "DecoDocs explains contracts in plain language, highlights risks, and helps you act with confidence -- before it's too late.";
+  "DecoDocs explains contracts in plain language, highlights risks, and helps you act with confidence — before you sign.";
 const canonical = "https://snapsign.com.au/understand-contracts/";
 const twitterDescription =
   "DecoDocs explains contracts in plain language, highlights risks, and helps you act with confidence.";
@@ -22,9 +23,9 @@ const twitterDescription =
     <section class="page-hero">
       <span class="eyebrow">DecoDocs use case</span>
       <h1>Understand your contract before you sign it</h1>
-      <h2>DecoDocs explains contracts in plain language, highlights risks, and helps you act with confidence -- before it's too late</h2>
+      <h2>DecoDocs explains contracts in plain language, highlights risks, and helps you act with confidence — before you sign</h2>
 
-      <a href="https://decodocs.com" class="button">Upload a Contract to Decode</a>
+      <a href="https://decodocs.com/?utm_source=snapsign.com.au&utm_medium=use_case&utm_campaign=understand_contracts" class="button">Upload a Contract to Decode</a>
     </section>
 
     <div class="problem-section">
@@ -63,7 +64,9 @@ const twitterDescription =
       </ol>
     </div>
 
-    <a href="https://decodocs.com" class="button">Upload a Contract to Decode</a>
+    <a href="https://decodocs.com/?utm_source=snapsign.com.au&utm_medium=use_case&utm_campaign=understand_contracts_bottom" class="button">Upload a Contract to Decode</a>
+
+    <FeedbackCTA />
 
   </div>
 </BaseLayout>

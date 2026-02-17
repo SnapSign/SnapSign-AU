@@ -1,0 +1,113 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+import FeedbackCTA from "../components/FeedbackCTA.astro";
+
+const title = "Security, Data Handling & Integrations | Snap Sign / DecoDocs";
+const description =
+  "How DecoDocs handles documents by default (Open vs Upload), token revocation expectations, and our read-only cloud drive integration approach.";
+const canonical = "https://snapsign.com.au/security/";
+
+const docsBase = "https://docs.decodocs.com/security";
+---
+
+<BaseLayout title={title} description={description} canonical={canonical} ogUrl={canonical}>
+  <div class="container">
+    <SiteHeader />
+
+    <section class="page-hero">
+      <span class="eyebrow">Trust &amp; Safety</span>
+      <h1>Security, data handling &amp; integrations</h1>
+      <h2>
+        A plain-English overview of how DecoDocs handles documents by default, plus our approach to read-only cloud
+        drives.
+      </h2>
+      <a class="button primary-cta" href="https://decodocs.com/?utm_source=snapsign.com.au&utm_medium=security_page&utm_campaign=try_decodocs">
+        Try DecoDocs Free
+      </a>
+    </section>
+
+    <section class="problem-section">
+      <h3>Open vs Upload (Free vs Pro) — the contract</h3>
+      <p>
+        We separate “open a file to analyze it” from “upload/save a file for history.” This reduces accidental storage
+        and keeps control with the user.
+      </p>
+      <ul>
+        <li><strong>Default is Open (ephemeral):</strong> analyze without creating history or a saved copy.</li>
+        <li><strong>Upload/Save is explicit:</strong> a deliberate action that creates history and enables export/sharing workflows.</li>
+        <li><strong>Paid features map to storage:</strong> vaults, history, and exports are tied to explicit upload/save behavior.</li>
+      </ul>
+      <p>
+        <a href={`${docsBase}#open-vs-upload`} target="_blank" rel="noopener noreferrer">Read the full spec in docs →</a>
+      </p>
+    </section>
+
+    <section class="problem-section">
+      <h3>Token revocation &amp; audit logging expectations</h3>
+      <p>
+        For integrations that require OAuth tokens (for example Drive/OneDrive), we design for safe disconnect and
+        reviewable events.
+      </p>
+      <ul>
+        <li><strong>User can disconnect anytime:</strong> disconnect revokes access where possible and stops further reads.</li>
+        <li><strong>Short-lived access:</strong> prefer short-lived access tokens; refresh tokens are protected and rotated.</li>
+        <li><strong>Audit trail:</strong> connect/disconnect and access events should be attributable and reviewable.</li>
+      </ul>
+      <p>
+        <a href={`${docsBase}#token-revocation-and-audit-logging`} target="_blank" rel="noopener noreferrer">Read details in docs →</a>
+      </p>
+    </section>
+
+    <section class="problem-section">
+      <h3>Cloud drives (read-only) — approach</h3>
+      <p>
+        Our goal is simple: let users choose a file from their drive, open it, analyze it — without background syncing or
+        indexing.
+      </p>
+
+      <h4>Google Drive (read-only)</h4>
+      <ul>
+        <li><strong>Connect/disconnect UX:</strong> clear consent, clear scope, and one-click disconnect.</li>
+        <li><strong>Picker → open → analyze:</strong> user selects a file, we fetch the file, then run analysis.</li>
+        <li><strong>Token storage:</strong> encrypted at rest, with rotation and revocation support.</li>
+      </ul>
+      <p>
+        <a href={`${docsBase}#google-drive-read-only`} target="_blank" rel="noopener noreferrer">Google Drive design notes →</a>
+      </p>
+
+      <h4>OneDrive (read-only)</h4>
+      <ul>
+        <li><strong>Microsoft Graph:</strong> consistent UX and behavior with Drive where possible.</li>
+        <li><strong>Cross-browser matrix:</strong> test common desktop/mobile browser combinations.</li>
+      </ul>
+      <p>
+        <a href={`${docsBase}#onedrive-read-only`} target="_blank" rel="noopener noreferrer">OneDrive design notes →</a>
+      </p>
+
+      <h4>iCloud Drive</h4>
+      <ul>
+        <li><strong>User-initiated selection:</strong> iOS/Safari constraints mean user-driven file selection flows.</li>
+        <li><strong>Parity:</strong> once selected, “open and analyze” should behave like local uploads.</li>
+      </ul>
+      <p>
+        <a href={`${docsBase}#icloud-drive`} target="_blank" rel="noopener noreferrer">iCloud Drive notes →</a>
+      </p>
+    </section>
+
+    <section class="benefits-section">
+      <h3>Security checklist (cloud drives)</h3>
+      <ul>
+        <li><strong>Least-privilege scopes:</strong> read-only access, no write/delete.</li>
+        <li><strong>No background sync or indexing:</strong> only access files the user selects.</li>
+        <li><strong>Clear messaging:</strong> explain what is (and is not) stored, and when.</li>
+      </ul>
+      <p>
+        <a href={`${docsBase}#security-checklist`} target="_blank" rel="noopener noreferrer">Full checklist in docs →</a>
+      </p>
+    </section>
+
+    <FeedbackCTA />
+  </div>
+</BaseLayout>
+

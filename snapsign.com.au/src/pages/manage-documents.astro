@@ -1,10 +1,11 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import SiteHeader from "../components/SiteHeader.astro";
+import FeedbackCTA from "../components/FeedbackCTA.astro";
 
 const title = "Manage All Your Business Documents in One Place | DecoDocs";
 const description =
-  "DecoDocs helps freelancers and small businesses store, organize, and reuse documents -- with understanding built in.";
+  "DecoDocs helps freelancers and small businesses store, organize, and reuse documents — with understanding built in.";
 const canonical = "https://snapsign.com.au/manage-documents/";
 const twitterDescription = "Store, organize, and reuse documents with understanding built in.";
 ---
@@ -21,9 +22,9 @@ const twitterDescription = "Store, organize, and reuse documents with understand
     <section class="page-hero">
       <span class="eyebrow">DecoDocs use case</span>
       <h1>Manage all your business documents in one place</h1>
-      <h2>DecoDocs helps freelancers and small businesses store, organize, and reuse documents -- with understanding built in</h2>
+      <h2>DecoDocs helps freelancers and small businesses store, organize, and reuse documents — with understanding built in</h2>
 
-      <a href="https://decodocs.com" class="button">Start Your Document Workspace</a>
+      <a href="https://decodocs.com/?utm_source=snapsign.com.au&utm_medium=use_case&utm_campaign=manage_documents" class="button">Start Your Document Workspace</a>
     </section>
 
     <div class="problem-section">
@@ -62,7 +63,9 @@ const twitterDescription = "Store, organize, and reuse documents with understand
       </ol>
     </div>
 
-    <a href="https://decodocs.com" class="button">Start Managing Documents Now</a>
+    <a href="https://decodocs.com/?utm_source=snapsign.com.au&utm_medium=use_case&utm_campaign=manage_documents_bottom" class="button">Start Managing Documents Now</a>
+
+    <FeedbackCTA />
 
   </div>
 </BaseLayout>

@@ -5,8 +5,14 @@
   "targets": {
     "snapsign-au": {
       "hosting": {
+        "snapsign": [
+          "snapsign-au"
+        ],
         "decodocs": [
           "decodocs-site"
+        ],
+        "decodocs-admin": [
+          "decodocs-admin"
         ]
       }
     }

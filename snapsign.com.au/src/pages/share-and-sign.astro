@@ -1,10 +1,11 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import SiteHeader from "../components/SiteHeader.astro";
+import FeedbackCTA from "../components/FeedbackCTA.astro";
 
 const title = "Share and Sign Documents with Confidence | DecoDocs";
 const description =
-  "DecoDocs lets you understand documents first -- then share and sign them knowing exactly what you're agreeing to.";
+  "DecoDocs lets you understand documents first — then share and sign them knowing what you're agreeing to.";
 const canonical = "https://snapsign.com.au/share-and-sign/";
 const twitterDescription =
   "Understand documents first, then share and sign knowing exactly what you're agreeing to.";
@@ -22,9 +23,9 @@ const twitterDescription =
     <section class="page-hero">
       <span class="eyebrow">DecoDocs use case</span>
       <h1>Share and sign documents with confidence</h1>
-      <h2>DecoDocs lets you understand documents first -- then share and sign them knowing exactly what you're agreeing to</h2>
+      <h2>DecoDocs lets you understand documents first — then share and sign them knowing what you're agreeing to</h2>
 
-      <a href="https://decodocs.com" class="button">Upload a Document to Get Started</a>
+      <a href="https://decodocs.com/?utm_source=snapsign.com.au&utm_medium=use_case&utm_campaign=share_and_sign" class="button">Upload a Document to Get Started</a>
     </section>
 
     <div class="problem-section">
@@ -63,7 +64,9 @@ const twitterDescription =
       </ol>
     </div>
 
-    <a href="https://decodocs.com" class="button">Upload a Document and Share It</a>
+    <a href="https://decodocs.com/?utm_source=snapsign.com.au&utm_medium=use_case&utm_campaign=share_and_sign_bottom" class="button">Upload a Document and Share It</a>
+
+    <FeedbackCTA />
 
   </div>
 </BaseLayout>

@@ -1,12 +1,13 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import SiteHeader from "../components/SiteHeader.astro";
+import FeedbackCTA from "../components/FeedbackCTA.astro";
 
-const title = "Snap Sign | AI-Powered Document Intelligence & Enterprise Signing";
+const title = "Snap Sign — Understand Contracts & PDFs with DecoDocs AI";
 const description =
-  "Snap Sign Pty Ltd builds AI tools for document clarity and enterprise signing. DecoDocs decodes contracts before you commit.";
+  "DecoDocs by Snap Sign turns contracts and PDFs into plain English: summaries, risk flags, and evidence-backed explanations. Free mode available.";
 const ogDescription =
-  "Snap Sign Pty Ltd builds AI tools for document clarity and enterprise signing. DecoDocs decodes contracts before you commit.";
+  "DecoDocs by Snap Sign turns contracts and PDFs into plain English: summaries, risk flags, and evidence-backed explanations. Free mode available.";
 const canonical = "https://snapsign.com.au/";
 ---
 <BaseLayout
@@ -24,10 +25,10 @@ const canonical = "https://snapsign.com.au/";
     <section class="hero" id="hero">
       <div class="hero-grid">
         <div class="hero-copy">
-          <span class="eyebrow">AI-powered document intelligence</span>
-          <h1>Decode documents before you sign. With AI precision.</h1>
+          <span class="eyebrow">DecoDocs by Snap Sign</span>
+          <h1>Understand documents before you sign.</h1>
           <p class="hero-lede">
-            DecoDocs turns dense contracts and PDFs into clear decisions — with AI summaries, risk flags, and evidence-backed explanations.
+            Upload a contract or PDF and get a plain-English summary, risk flags, and “where it says that” evidence — so you can decide with confidence.
           </p>
           <div class="hero-actions">
             <a
@@ -35,18 +36,23 @@ const canonical = "https://snapsign.com.au/";
               class="button primary-cta"
               aria-label="Analyze a document with DecoDocs"
             >
-              Analyze a Document
+              Try DecoDocs Free
             </a>
             <a class="button secondary" href="https://decodocs.com/view">View Demo</a>
+            <a class="text-link" href="#feedback">After you try it: leave feedback →</a>
           </div>
           <div class="hero-badges">
             <span class="hero-badge">
               <span class="badge-dot badge-dot-emerald"></span>
-              Free mode never stores files
+              Free mode: processed, not stored
             </span>
             <span class="hero-badge">
               <span class="badge-dot"></span>
-              Pro includes vaults &amp; history
+              Pro: vaults &amp; history
+            </span>
+            <span class="hero-badge">
+              <span class="badge-dot"></span>
+              Not legal advice — clarity first
             </span>
           </div>
         </div>
@@ -58,9 +64,9 @@ const canonical = "https://snapsign.com.au/";
 
     <section class="product-spotlight" id="features">
       <div class="spotlight-content">
-        <h2>Product Spotlight: DecoDocs</h2>
+        <h2>DecoDocs, our first product</h2>
         <p>
-          Upload a PDF to get plain-English explanations, risks, and what to check — before you sign. Free tier available.
+          Get clarity on contracts, policies, offers, and reports — before you commit. Free tier available.
         </p>
         <h3>DecoDocs Capabilities</h3>
         <div class="capability-grid">
@@ -82,7 +88,7 @@ const canonical = "https://snapsign.com.au/";
           <div class="capability-card">
             <span class="capability-label">AI</span>
             <h4>Shareable decision reports</h4>
-            <p>Create a clean, board-ready summary in one click.</p>
+            <p>Create a clean summary you can share with a partner or team.</p>
           </div>
           <div class="capability-card">
             <span class="capability-label">AI</span>
@@ -174,6 +180,10 @@ const canonical = "https://snapsign.com.au/";
         <li>Server-side only AI processing and access control.</li>
         <li>Short-lived upload/download links, no long-lived public URLs.</li>
         <li>No secrets or API keys in the browser.</li>
+        <li>Not legal advice — use it as a clarity tool.</li>
+        <li>
+          <a href="/security/">Security, data handling &amp; integrations notes</a>
+        </li>
       </ul>
     </section>
 
@@ -193,11 +203,11 @@ const canonical = "https://snapsign.com.au/";
           <span class="eyebrow">The Engineering Mind</span>
           <h2>Precision Engineering meets Legal Clarity.</h2>
           <p>
-            Built by data engineer Iryna Vasylkova, SnapSign was created to solve a singular problem: the complexity of digital commitment. We integrate DecoDocs AI to ensure you don't just sign — you understand.
+            Built by engineer Iryna Vasylkova, Snap Sign was created to tackle one problem: digital commitments are confusing. DecoDocs helps you understand what you’re agreeing to before you sign.
           </p>
           <span class="founder-name">Iryna Vasylkova</span>
           <span class="founder-title-label">Founder &amp; CEO, Snap Sign Pty Ltd</span>
-          <div style="margin-top: 20px;">
+          <div class="u-mt-20">
             <a
               class="btn-teal"
               href="https://decodocs.com/?utm_source=snapsign.com.au&utm_medium=landing&utm_campaign=founder_cta"
@@ -210,9 +220,9 @@ const canonical = "https://snapsign.com.au/";
     </section>
 
     <section class="roadmap" id="roadmap">
-      <h2>Product Roadmap</h2>
+      <h2>What we’re building next</h2>
       <div class="roadmap-quarter">
-        <h3>Q3 2026: User Management & Mobile Integration</h3>
+        <h3>2026: User management & mobile</h3>
         <ul>
           <li><strong>User Authentication:</strong> Secure login and registration system</li>
           <li><strong>User Profiles:</strong> Personalized settings and preferences</li>
@@ -223,7 +233,7 @@ const canonical = "https://snapsign.com.au/";
         </ul>
       </div>
       <div class="roadmap-quarter">
-        <h3>Q4 2026: Advanced AI Insights & Analysis</h3>
+        <h3>2026: Advanced AI insights</h3>
         <ul>
           <li><strong>OCR Integration:</strong> Support for scanned documents and images</li>
           <li><strong>Multi-language Support:</strong> Analysis in multiple languages</li>
@@ -235,11 +245,13 @@ const canonical = "https://snapsign.com.au/";
       </div>
     </section>
 
+    <FeedbackCTA />
+
     <section class="cta">
       <h2>Ready to decode your next document?</h2>
       <a href="https://decodocs.com/?utm_source=snapsign.com.au&utm_medium=landing&utm_campaign=bottom_cta" class="button primary-cta">Get Started Free</a>
       <p>
-        Upload a contract, policy, or report. DecoDocs AI analyses it in seconds — plain-English summaries, risk flags, and shareable reports included.
+        Upload a contract, policy, or report. DecoDocs analyses it in seconds — plain-English summaries, risk flags, and evidence-backed explanations included.
       </p>
     </section>
 

@@ -1,0 +1,27 @@
+---
+const {
+  eyebrow = "Help a startup",
+  heading = "Tried DecoDocs? Help us make it clearer for everyday people.",
+  body = "If you tried it (even for 1 minute), tell us what was confusing or missing. We read every response — it helps us build a tool that can help many people make safer decisions.",
+  formHref = "https://forms.gle/fbf9WmwWAsHCBXnH9",
+  formCta = "Leave feedback (1–2 min)",
+  emailHref = "mailto:team@snapsign.com?subject=DecoDocs%20feedback",
+  emailCta = "Email feedback",
+  note = "No pressure — but your feedback genuinely helps us improve.",
+} = Astro.props;
+---
+
+<section class="feedback-section" id="feedback" aria-label="Feedback">
+  <div class="feedback-card">
+    <span class="eyebrow">{eyebrow}</span>
+    <h2>{heading}</h2>
+    <p>{body}</p>
+    <div class="feedback-actions">
+      <a class="button primary-cta" href={formHref} target="_blank" rel="noopener noreferrer">
+        {formCta}
+      </a>
+      <a class="button secondary" href={emailHref}>{emailCta}</a>
+    </div>
+    <p class="feedback-note">{note}</p>
+  </div>
+</section>

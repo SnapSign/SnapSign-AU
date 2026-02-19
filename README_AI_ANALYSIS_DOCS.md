@@ -1,5 +1,12 @@
 # DecoDocs AI Analysis Implementation - Complete Documentation Index
 
+> Status: `snapshot` (historical planning bundle)
+>
+> Canonical references for current behavior:
+> - `docs/FUNCTIONS_IMPLEMENTATION.md`
+> - `Decodocs/docs/API.md`
+> - `Decodocs/docs/README.md`
+
 **Created:** February 16, 2026  
 **Project:** Complete AI Analysis Functionality  
 **Status:** ✅ Planning Complete - Ready for Development

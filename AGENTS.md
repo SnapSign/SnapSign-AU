@@ -43,3 +43,10 @@ If a deployment ever requests Blaze/Cloud Build/Artifact Registry for basic stat
   - logical field path notation: `/admin/gemini/key`
 - Example write payload:
   - `POST /setDocByPath` with `{ "qpath": "admin/gemini", "data": { "key": "AIza..." } }`
+
+## Environment Policy (Required)
+- Do not create or rely on `.env*` files (`.env`, `.env.local`, `.env.production`, etc.) in this repo.
+- Do not add dotenv loaders to scripts, functions, web, or admin apps.
+- Allowed config sources:
+  - Firestore admin config documents (preferred for product/runtime config), and
+  - platform-provided process environment (CI/Firebase runtime/shell), without local env files.

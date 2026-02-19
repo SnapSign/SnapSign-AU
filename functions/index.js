@@ -10,7 +10,8 @@ const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/clien
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { isProFlagEnabled } = require('./lib/entitlement');
 const { normalizeObjectKey, assertUserScopedKey } = require('./lib/storage-access');
-const { getGeminiModel } = require('./lib/gemini-client');
+const geminiClient = require('./lib/gemini-client');
+const { getGeminiModel } = geminiClient;
 const { buildAnalysisPrompt, buildExplanationPrompt, buildRiskPrompt, buildTranslationPrompt, buildTypeSpecificPrompt } = require('./lib/prompts');
 const { analysisSchema, explanationSchema, riskAssessmentSchema, translationSchema, typeSpecificSchema } = require('./lib/analysis-schema');
 
@@ -50,6 +51,9 @@ if (admin.apps.length === 0) {
 
 const db = admin.firestore();
 
+const ADMIN_EMAIL_DOMAIN = '@snapsign.com.au';
+const ADMIN_CONFIG_DOC_IDS = ['stripe', 'plans', 'flags', 'policies'];
+
 // Configuration constants
 const CONFIG = {
   // Scan detection
@@ -67,6 +71,10 @@ const CONFIG = {
   TTL_DAYS_USAGE_DOCS: 30,
 };
 
+const ADMIN_AI_EVENTS_COLLECTION = 'admin_ai_events';
+const ADMIN_REPORTS_COLLECTION = 'admin_reports';
+const DEFAULT_GEMINI_MODEL_NAME = 'gemini-2.5-flash';
+
 // Function to validate auth context
 const validateAuth = (context) => {
   if (!context.auth || !context.auth.uid) {
@@ -76,6 +84,155 @@ const validateAuth = (context) => {
     );
   }
   return context.auth.uid;
+};
+
+const isSnapsignAdminEmail = (email) =>
+  typeof email === 'string' && email.toLowerCase().endsWith(ADMIN_EMAIL_DOMAIN);
+
+const validateAdminContext = (context) => {
+  const uid = validateAuth(context);
+  const email = context?.auth?.token?.email || '';
+  if (!isSnapsignAdminEmail(email)) {
+    throw new functions.https.HttpsError(
+      'permission-denied',
+      'Admin access requires a @snapsign.com.au account.'
+    );
+  }
+  return { uid, email };
+};
+
+const ensurePlainObject = (value) =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+
+const assertStringPrefix = (errors, value, pathLabel, prefix) => {
+  if (value === undefined) return;
+  if (typeof value !== 'string' || !value.startsWith(prefix)) {
+    errors.push(`${pathLabel} must be a string starting with "${prefix}"`);
+  }
+};
+
+const assertHttpUrl = (errors, value, pathLabel) => {
+  if (value === undefined) return;
+  if (typeof value !== 'string' || !/^https?:\/\//i.test(value)) {
+    errors.push(`${pathLabel} must be a valid http(s) URL`);
+  }
+};
+
+const validateStringMap = ({ errors, value, pathLabel, requiredPrefix = null }) => {
+  if (value === undefined) return;
+  if (!ensurePlainObject(value)) {
+    errors.push(`${pathLabel} must be an object`);
+    return;
+  }
+  for (const [k, v] of Object.entries(value)) {
+    if (typeof v !== 'string' || v.trim().length === 0) {
+      errors.push(`${pathLabel}.${k} must be a non-empty string`);
+      continue;
+    }
+    if (requiredPrefix && !v.startsWith(requiredPrefix)) {
+      errors.push(`${pathLabel}.${k} must start with "${requiredPrefix}"`);
+    }
+  }
+};
+
+const validateStripeModeConfig = (errors, modeCfg, label) => {
+  if (modeCfg === undefined) return;
+  if (!ensurePlainObject(modeCfg)) {
+    errors.push(`${label} must be an object`);
+    return;
+  }
+  assertStringPrefix(errors, modeCfg.apiKey, `${label}.apiKey`, 'sk_');
+  assertStringPrefix(errors, modeCfg.publishableKey, `${label}.publishableKey`, 'pk_');
+  assertStringPrefix(errors, modeCfg.webhookSecret, `${label}.webhookSecret`, 'whsec_');
+  validateStringMap({ errors, value: modeCfg.productIds, pathLabel: `${label}.productIds`, requiredPrefix: 'prod_' });
+  validateStringMap({ errors, value: modeCfg.priceIds, pathLabel: `${label}.priceIds`, requiredPrefix: 'price_' });
+};
+
+const validateAdminConfigPayload = ({ qpath, data }) => {
+  const errors = [];
+  if (!ensurePlainObject(data)) {
+    errors.push('data must be a JSON object');
+    return errors;
+  }
+
+  if (qpath === 'admin/stripe') {
+    if (data.mode !== undefined && data.mode !== 'test' && data.mode !== 'prod') {
+      errors.push('mode must be "test" or "prod"');
+    }
+    assertHttpUrl(errors, data.successUrl, 'successUrl');
+    assertHttpUrl(errors, data.cancelUrl, 'cancelUrl');
+    assertHttpUrl(errors, data.portalReturnUrl, 'portalReturnUrl');
+
+    // Backward-compatible flat fields.
+    assertStringPrefix(errors, data.apiKey, 'apiKey', 'sk_');
+    assertStringPrefix(errors, data.publishableKey, 'publishableKey', 'pk_');
+    assertStringPrefix(errors, data.webhookSecret, 'webhookSecret', 'whsec_');
+    validateStringMap({ errors, value: data.productIds, pathLabel: 'productIds', requiredPrefix: 'prod_' });
+    validateStringMap({ errors, value: data.priceIds, pathLabel: 'priceIds', requiredPrefix: 'price_' });
+
+    // Preferred mode-specific fields.
+    validateStripeModeConfig(errors, data.test, 'test');
+    validateStripeModeConfig(errors, data.prod, 'prod');
+  } else if (qpath === 'admin/flags') {
+    for (const [k, v] of Object.entries(data)) {
+      if (k.startsWith('_') || k.endsWith('At')) continue;
+      if (typeof v !== 'boolean') {
+        errors.push(`${k} must be boolean`);
+      }
+    }
+  } else if (qpath === 'admin/plans') {
+    for (const [planName, planCfg] of Object.entries(data)) {
+      if (planName.startsWith('_') || planName.endsWith('At')) continue;
+      if (!ensurePlainObject(planCfg)) {
+        errors.push(`${planName} must be an object`);
+        continue;
+      }
+      for (const [k, v] of Object.entries(planCfg)) {
+        if (k.endsWith('Enabled')) {
+          if (typeof v !== 'boolean') errors.push(`${planName}.${k} must be boolean`);
+          continue;
+        }
+        if (typeof v === 'number' && v < 0) {
+          errors.push(`${planName}.${k} must be >= 0`);
+        }
+      }
+    }
+  } else if (qpath === 'admin/policies') {
+    if (data.rateLimit !== undefined && !ensurePlainObject(data.rateLimit)) {
+      errors.push('rateLimit must be an object');
+    }
+    if (ensurePlainObject(data.rateLimit) && data.rateLimit.perMinute !== undefined) {
+      if (typeof data.rateLimit.perMinute !== 'number' || data.rateLimit.perMinute <= 0) {
+        errors.push('rateLimit.perMinute must be a positive number');
+      }
+    }
+  }
+
+  return errors;
+};
+
+const getBearerToken = (req) => {
+  const authHeader = req.get('authorization') || req.get('Authorization') || '';
+  if (!authHeader.startsWith('Bearer ')) return null;
+  return authHeader.slice('Bearer '.length).trim();
+};
+
+const validateAdminRequest = async (req) => {
+  const token = getBearerToken(req);
+  if (!token) {
+    throw new functions.https.HttpsError(
+      'unauthenticated',
+      'Missing Authorization header. Expected: Bearer <Firebase ID token>.'
+    );
+  }
+  const decoded = await admin.auth().verifyIdToken(token);
+  if (!isSnapsignAdminEmail(decoded?.email)) {
+    throw new functions.https.HttpsError(
+      'permission-denied',
+      'Admin access requires a @snapsign.com.au account.'
+    );
+  }
+  return decoded;
 };
 
 const getAuthFlags = (context) => {
@@ -234,6 +391,93 @@ const validateOutputSchema = (result) => {
   return result;
 };
 
+const safeString = (value, fallback = '') => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed) return trimmed;
+  }
+  if (value === null || value === undefined) return fallback;
+  const asText = String(value).trim();
+  return asText || fallback;
+};
+
+const getActiveGeminiModelName = () => {
+  if (typeof geminiClient.getResolvedGeminiModelName === 'function') {
+    return safeString(geminiClient.getResolvedGeminiModelName(), DEFAULT_GEMINI_MODEL_NAME);
+  }
+  return safeString(geminiClient.MODEL_NAME, DEFAULT_GEMINI_MODEL_NAME);
+};
+
+const logAdminAiEvent = async ({ eventType, payload }) => {
+  await db.collection(ADMIN_AI_EVENTS_COLLECTION).add({
+    eventType,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    ...payload,
+  });
+};
+
+const redactSensitive = (key, value) => {
+  const lowered = String(key || '').toLowerCase();
+  const sensitiveFragments = ['text', 'content', 'selection', 'pdf', 'base64', 'raw'];
+  if (sensitiveFragments.some((fragment) => lowered.includes(fragment))) {
+    return '[REDACTED]';
+  }
+  return value;
+};
+
+const sanitizeReportValue = (value, depth = 0) => {
+  if (depth > 4) return '[TRUNCATED]';
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string') return value.slice(0, 3000);
+  if (typeof value === 'number' || typeof value === 'boolean') return value;
+  if (Array.isArray(value)) return value.slice(0, 20).map((item) => sanitizeReportValue(item, depth + 1));
+  if (typeof value === 'object') {
+    const out = {};
+    for (const [k, v] of Object.entries(value).slice(0, 40)) {
+      out[k] = sanitizeReportValue(redactSensitive(k, v), depth + 1);
+    }
+    return out;
+  }
+  return String(value).slice(0, 500);
+};
+
+const logAdminReport = async (report) => {
+  await db.collection(ADMIN_REPORTS_COLLECTION).add({
+    status: 'open',
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    ...report,
+  });
+};
+
+const logBackendException = async ({ functionName, error, context = null, input = null }) => {
+  try {
+    const token = context?.auth?.token || {};
+    await logAdminReport({
+      reportType: 'backend_exception',
+      source: 'functions',
+      severity: 'error',
+      functionName: safeString(functionName, 'unknown'),
+      message: safeString(error?.message, 'Unknown error'),
+      code: safeString(error?.code, null),
+      statusCode: Number.isFinite(Number(error?.status)) ? Number(error.status) : null,
+      stack: safeString(error?.stack, '').slice(0, 6000),
+      uid: context?.auth?.uid || null,
+      email: token?.email || null,
+      authProvider: token?.firebase?.sign_in_provider || null,
+      input: sanitizeReportValue(input || null),
+    });
+  } catch (loggingError) {
+    console.error('Failed to log backend exception:', loggingError);
+  }
+};
+
+const normalizeReportKind = (kind) => {
+  const normalized = String(kind || '').trim().toLowerCase();
+  if (normalized === 'bug' || normalized === 'feedback') return normalized;
+  return null;
+};
+
 // Preflight check function
 exports.preflightCheck = functions.https.onCall(async ({ data, ...context }) => {
   try {
@@ -309,6 +553,12 @@ exports.preflightCheck = functions.https.onCall(async ({ data, ...context }) => 
 
   } catch (error) {
     console.error('Preflight check error:', error);
+    await logBackendException({
+      functionName: 'preflightCheck',
+      error,
+      context,
+      input: { docHash: data?.docHash, stats: data?.stats },
+    });
 
     if (error instanceof functions.https.HttpsError) {
       throw error;
@@ -416,6 +666,12 @@ exports.analyzeText = functions.https.onCall(async ({ data, ...context }) => {
   } catch (error) {
     console.error('Analyze text error:', error);
     console.error('DEBUG: Original error detail:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
+    await logBackendException({
+      functionName: 'analyzeText',
+      error,
+      context,
+      input: { docHash: data?.docHash, stats: data?.stats, options: data?.options },
+    });
     if (error instanceof functions.https.HttpsError) throw error;
     throw new functions.https.HttpsError('internal', 'An error occurred during text analysis.');
   }
@@ -464,6 +720,12 @@ exports.explainSelection = functions.https.onCall(async ({ data, ...context }) =
 
   } catch (error) {
     console.error('Explain selection error:', error);
+    await logBackendException({
+      functionName: 'explainSelection',
+      error,
+      context,
+      input: { docHash: data?.docHash, hasDocumentContext: !!data?.documentContext },
+    });
     throw new functions.https.HttpsError('internal', 'Failed to explain selection');
   }
 });
@@ -508,6 +770,12 @@ exports.highlightRisks = functions.https.onCall(async ({ data, ...context }) => 
 
   } catch (error) {
     console.error('Highlight risks error:', error);
+    await logBackendException({
+      functionName: 'highlightRisks',
+      error,
+      context,
+      input: { docHash: data?.docHash, documentType: data?.documentType },
+    });
     throw new functions.https.HttpsError('internal', 'Failed to analyze risks');
   }
 });
@@ -552,6 +820,12 @@ exports.translateToPlainEnglish = functions.https.onCall(async ({ data, ...conte
 
   } catch (error) {
     console.error('Translate error:', error);
+    await logBackendException({
+      functionName: 'translateToPlainEnglish',
+      error,
+      context,
+      input: { docHash: data?.docHash },
+    });
     throw new functions.https.HttpsError('internal', 'Failed to translate text');
   }
 });
@@ -577,6 +851,12 @@ exports.getEntitlement = functions.https.onCall(async ({ data, ...context }) => 
     return entitlements;
   } catch (error) {
     console.error('Get entitlement error:', error);
+    await logBackendException({
+      functionName: 'getEntitlement',
+      error,
+      context,
+      input: null,
+    });
 
     if (error instanceof functions.https.HttpsError) {
       throw error;
@@ -587,6 +867,44 @@ exports.getEntitlement = functions.https.onCall(async ({ data, ...context }) => 
       'An error occurred while fetching entitlements.'
     );
   }
+});
+
+// Public report intake from web UI (feedback + bug reports).
+exports.submitUserReport = functions.https.onCall(async ({ data, ...context }) => {
+  const kind = normalizeReportKind(data?.kind);
+  if (!kind) {
+    throw new functions.https.HttpsError('invalid-argument', 'kind must be "feedback" or "bug"');
+  }
+
+  const message = safeString(data?.message, '');
+  if (message.length < 8) {
+    throw new functions.https.HttpsError('invalid-argument', 'message must be at least 8 characters');
+  }
+  if (message.length > 5000) {
+    throw new functions.https.HttpsError('invalid-argument', 'message is too long');
+  }
+
+  const pageUrl = safeString(data?.pageUrl, '');
+  const userAgent = safeString(data?.userAgent, '');
+  const extra = sanitizeReportValue(data?.extra || null);
+  const token = context?.auth?.token || {};
+
+  const reportType = kind === 'bug' ? 'user_bug' : 'user_feedback';
+  await logAdminReport({
+    reportType,
+    source: 'web',
+    severity: kind === 'bug' ? 'warning' : 'info',
+    functionName: 'submitUserReport',
+    message,
+    pageUrl: pageUrl || null,
+    userAgent: userAgent || null,
+    uid: context?.auth?.uid || null,
+    email: token?.email || null,
+    authProvider: token?.firebase?.sign_in_provider || null,
+    input: extra,
+  });
+
+  return { ok: true };
 });
 
 // --- MinIO / S3 (Firestore-backed config, no env secrets) ---
@@ -674,70 +992,90 @@ const ensureProStorageAccess = (entitlement) => {
 
 // Callable: create a pre-signed PUT URL for direct upload to MinIO.
 exports.storageCreateUploadUrl = functions.https.onCall(async ({ data, ...context }) => {
-  const entitlement = await getUserEntitlement(context);
-  ensureProStorageAccess(entitlement);
+  try {
+    const entitlement = await getUserEntitlement(context);
+    ensureProStorageAccess(entitlement);
 
-  const storageCfg = await getStorageAdminConfig();
-  const { s3, bucket, endpoint } = getStorageClient(storageCfg);
+    const storageCfg = await getStorageAdminConfig();
+    const { s3, bucket, endpoint } = getStorageClient(storageCfg);
 
-  const requestedKey = normalizeObjectKey(data?.key);
-  const contentType = String(data?.contentType || 'application/octet-stream');
-  const expiresIn = Math.min(Math.max(Number(data?.expiresIn || 300), 60), 3600);
+    const requestedKey = normalizeObjectKey(data?.key);
+    const contentType = String(data?.contentType || 'application/octet-stream');
+    const expiresIn = Math.min(Math.max(Number(data?.expiresIn || 300), 60), 3600);
 
-  // Enforce per-user namespace to avoid cross-user key collisions/access.
-  const key = requestedKey
-    ? (requestedKey.startsWith(`${entitlement.puid}/`) ? requestedKey : `${entitlement.puid}/${requestedKey}`)
-    : `${entitlement.puid}/uploads/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.bin`;
+    // Enforce per-user namespace to avoid cross-user key collisions/access.
+    const key = requestedKey
+      ? (requestedKey.startsWith(`${entitlement.puid}/`) ? requestedKey : `${entitlement.puid}/${requestedKey}`)
+      : `${entitlement.puid}/uploads/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.bin`;
 
-  const command = new PutObjectCommand({
-    Bucket: bucket,
-    Key: key,
-    ContentType: contentType,
-  });
-  const url = await getSignedUrl(s3, command, { expiresIn });
+    const command = new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      ContentType: contentType,
+    });
+    const url = await getSignedUrl(s3, command, { expiresIn });
 
-  return {
-    key,
-    bucket,
-    endpoint,
-    method: 'PUT',
-    contentType,
-    expiresIn,
-    url,
-  };
+    return {
+      key,
+      bucket,
+      endpoint,
+      method: 'PUT',
+      contentType,
+      expiresIn,
+      url,
+    };
+  } catch (error) {
+    await logBackendException({
+      functionName: 'storageCreateUploadUrl',
+      error,
+      context,
+      input: { key: data?.key || null, contentType: data?.contentType || null },
+    });
+    throw error;
+  }
 });
 
 // Callable: create a pre-signed GET URL for direct download from MinIO.
 exports.storageCreateDownloadUrl = functions.https.onCall(async ({ data, ...context }) => {
-  const entitlement = await getUserEntitlement(context);
-  ensureProStorageAccess(entitlement);
+  try {
+    const entitlement = await getUserEntitlement(context);
+    ensureProStorageAccess(entitlement);
 
-  const storageCfg = await getStorageAdminConfig();
-  const { s3, bucket, endpoint } = getStorageClient(storageCfg);
+    const storageCfg = await getStorageAdminConfig();
+    const { s3, bucket, endpoint } = getStorageClient(storageCfg);
 
-  const key = normalizeObjectKey(data?.key);
-  if (!key) {
-    throw new functions.https.HttpsError('invalid-argument', 'key is required');
+    const key = normalizeObjectKey(data?.key);
+    if (!key) {
+      throw new functions.https.HttpsError('invalid-argument', 'key is required');
+    }
+    if (!assertUserScopedKey(key, entitlement.puid)) {
+      throw new functions.https.HttpsError(
+        'permission-denied',
+        'key must be scoped to the authenticated user namespace'
+      );
+    }
+
+    const expiresIn = Math.min(Math.max(Number(data?.expiresIn || 300), 60), 3600);
+    const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+    const url = await getSignedUrl(s3, command, { expiresIn });
+
+    return {
+      key,
+      bucket,
+      endpoint,
+      method: 'GET',
+      expiresIn,
+      url,
+    };
+  } catch (error) {
+    await logBackendException({
+      functionName: 'storageCreateDownloadUrl',
+      error,
+      context,
+      input: { key: data?.key || null, expiresIn: data?.expiresIn || null },
+    });
+    throw error;
   }
-  if (!assertUserScopedKey(key, entitlement.puid)) {
-    throw new functions.https.HttpsError(
-      'permission-denied',
-      'key must be scoped to the authenticated user namespace'
-    );
-  }
-
-  const expiresIn = Math.min(Math.max(Number(data?.expiresIn || 300), 60), 3600);
-  const command = new GetObjectCommand({ Bucket: bucket, Key: key });
-  const url = await getSignedUrl(s3, command, { expiresIn });
-
-  return {
-    key,
-    bucket,
-    endpoint,
-    method: 'GET',
-    expiresIn,
-    url,
-  };
 });
 
 // --- Stripe (mock webhook + future real webhook) ---
@@ -796,83 +1134,103 @@ const isStripeProStatus = (status) => {
 
 // Callable: create a Stripe Checkout Session (Pro subscription)
 exports.stripeCreateCheckoutSession = functions.https.onCall(async ({ data, ...context }) => {
-  const uid = validateAuth(context);
-  const puid = await resolvePuidForUid(uid);
+  try {
+    const uid = validateAuth(context);
+    const puid = await resolvePuidForUid(uid);
 
-  const plan = String(data?.plan || 'pro').toLowerCase(); // pro | business
-  const billing = String(data?.billing || 'monthly'); // monthly | annual
-  const currency = String(data?.currency || 'usd').toLowerCase(); // usd | aud
-  if (plan !== 'pro' && plan !== 'business') {
-    throw new functions.https.HttpsError('invalid-argument', 'plan must be "pro" or "business"');
-  }
+    const plan = String(data?.plan || 'pro').toLowerCase(); // pro | business
+    const billing = String(data?.billing || 'monthly'); // monthly | annual
+    const currency = String(data?.currency || 'usd').toLowerCase(); // usd | aud
+    if (plan !== 'pro' && plan !== 'business') {
+      throw new functions.https.HttpsError('invalid-argument', 'plan must be "pro" or "business"');
+    }
 
-  const adminCfg = await getStripeAdminConfig();
-  const stripe = getStripeClient(adminCfg);
+    const adminCfg = await getStripeAdminConfig();
+    const stripe = getStripeClient(adminCfg);
 
-  const priceIds = adminCfg?.priceIds || {};
-  const billingKey = billing === 'annual' ? 'annual' : 'monthly';
-  // Currency suffix: "usd" is the default (no suffix), others get "_aud", "_eur", etc.
-  const currencySuffix = currency === 'usd' ? '' : `_${currency}`;
-  const priceIdKey = `${plan}_${billingKey}${currencySuffix}`;
-  const priceId = priceIds[priceIdKey];
-  if (!priceId) {
-    throw new functions.https.HttpsError(
-      'failed-precondition',
-      `Missing price id in Firestore admin/stripe.priceIds.${priceIdKey}`
-    );
-  }
+    const priceIds = adminCfg?.priceIds || {};
+    const billingKey = billing === 'annual' ? 'annual' : 'monthly';
+    // Currency suffix: "usd" is the default (no suffix), others get "_aud", "_eur", etc.
+    const currencySuffix = currency === 'usd' ? '' : `_${currency}`;
+    const priceIdKey = `${plan}_${billingKey}${currencySuffix}`;
+    const priceId = priceIds[priceIdKey];
+    if (!priceId) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        `Missing price id in Firestore admin/stripe.priceIds.${priceIdKey}`
+      );
+    }
 
-  const successUrl = String(adminCfg?.successUrl || 'http://localhost:5173/profile?stripe=success');
-  const cancelUrl = String(adminCfg?.cancelUrl || 'http://localhost:5173/pricing?stripe=cancel');
+    const successUrl = String(adminCfg?.successUrl || 'http://localhost:5173/profile?stripe=success');
+    const cancelUrl = String(adminCfg?.cancelUrl || 'http://localhost:5173/pricing?stripe=cancel');
 
-  const session = await stripe.checkout.sessions.create({
-    mode: 'subscription',
-    line_items: [{ price: priceId, quantity: 1 }],
-    success_url: successUrl,
-    cancel_url: cancelUrl,
-    client_reference_id: puid,
-    metadata: {
-      firebaseUid: uid,
-      puid,
-      plan,
-      billing,
-      currency,
-    },
-    subscription_data: {
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      client_reference_id: puid,
       metadata: {
         firebaseUid: uid,
         puid,
         plan,
+        billing,
+        currency,
       },
-    },
-  });
+      subscription_data: {
+        metadata: {
+          firebaseUid: uid,
+          puid,
+          plan,
+        },
+      },
+    });
 
-  return { url: session.url, id: session.id };
+    return { url: session.url, id: session.id };
+  } catch (error) {
+    await logBackendException({
+      functionName: 'stripeCreateCheckoutSession',
+      error,
+      context,
+      input: { plan: data?.plan || null, billing: data?.billing || null, currency: data?.currency || null },
+    });
+    throw error;
+  }
 });
 
 // Callable: create a Stripe Customer Portal session (receipts + manage subscription)
 exports.stripeCreatePortalSession = functions.https.onCall(async ({ data, ...context }) => {
-  const uid = validateAuth(context);
-  const puid = await resolvePuidForUid(uid);
+  try {
+    const uid = validateAuth(context);
+    const puid = await resolvePuidForUid(uid);
 
-  const adminCfg = await getStripeAdminConfig();
-  const stripe = getStripeClient(adminCfg);
+    const adminCfg = await getStripeAdminConfig();
+    const stripe = getStripeClient(adminCfg);
 
-  const userSnap = await db.collection('users').doc(puid).get();
-  const customerId = userSnap.exists ? userSnap.data()?.subscription?.customerId : null;
+    const userSnap = await db.collection('users').doc(puid).get();
+    const customerId = userSnap.exists ? userSnap.data()?.subscription?.customerId : null;
 
-  if (!customerId) {
-    throw new functions.https.HttpsError('failed-precondition', 'No Stripe customerId found for this user');
+    if (!customerId) {
+      throw new functions.https.HttpsError('failed-precondition', 'No Stripe customerId found for this user');
+    }
+
+    const returnUrl = String(adminCfg?.portalReturnUrl || adminCfg?.successUrl || 'http://localhost:5173/profile');
+
+    const session = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: returnUrl,
+    });
+
+    return { url: session.url };
+  } catch (error) {
+    await logBackendException({
+      functionName: 'stripeCreatePortalSession',
+      error,
+      context,
+      input: null,
+    });
+    throw error;
   }
-
-  const returnUrl = String(adminCfg?.portalReturnUrl || adminCfg?.successUrl || 'http://localhost:5173/profile');
-
-  const session = await stripe.billingPortal.sessions.create({
-    customer: customerId,
-    return_url: returnUrl,
-  });
-
-  return { url: session.url };
 });
 
 const upsertStripeSubscriptionState = async ({ puid, stripeStatus, customerId, subscriptionId, eventType }) => {
@@ -988,6 +1346,11 @@ exports.stripeWebhook = functions.https.onRequest(async (req, res) => {
     res.status(200).json({ ok: true, ignored: true, type });
   } catch (e) {
     console.error('stripeWebhook error:', e);
+    await logBackendException({
+      functionName: 'stripeWebhook',
+      error: e,
+      input: { method: req.method, path: req.path, eventType: req.body?.type || null },
+    });
     // Stripe expects non-2xx to retry. We should be strict.
     res.status(400).send(`Webhook Error: ${e.message}`);
   }
@@ -1034,6 +1397,11 @@ exports.stripeWebhookMock = functions.https.onRequest(async (req, res) => {
     res.status(200).json({ ok: true, ...result });
   } catch (e) {
     console.error('stripeWebhookMock error:', e);
+    await logBackendException({
+      functionName: 'stripeWebhookMock',
+      error: e,
+      input: { method: req.method, path: req.path, eventType: req.body?.type || null },
+    });
     res.status(500).json({ ok: false, error: e?.message || 'internal' });
   }
 });
@@ -1042,58 +1410,78 @@ exports.stripeWebhookMock = functions.https.onRequest(async (req, res) => {
 // Save per-user document type override (users are isolated)
 // Stored by puid+docHash so different users can have different classifications.
 exports.saveDocTypeOverride = functions.https.onCall(async ({ data, ...context }) => {
-  const { uid, puid } = await getUserEntitlement(context);
+  try {
+    const { uid, puid } = await getUserEntitlement(context);
 
-  const docHash = data?.docHash;
-  const typeId = String(data?.typeId || '').trim();
+    const docHash = data?.docHash;
+    const typeId = String(data?.typeId || '').trim();
 
-  validateDocHash(docHash);
-  if (!typeId || typeId.length > 80) {
-    throw new functions.https.HttpsError('invalid-argument', 'typeId is required');
+    validateDocHash(docHash);
+    if (!typeId || typeId.length > 80) {
+      throw new functions.https.HttpsError('invalid-argument', 'typeId is required');
+    }
+
+    const ref = db.collection('doc_type_overrides').doc(`${puid}_${docHash}`);
+    await ref.set(
+      {
+        puid,
+        uid,
+        docHash,
+        typeId,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    return { ok: true };
+  } catch (error) {
+    await logBackendException({
+      functionName: 'saveDocTypeOverride',
+      error,
+      context,
+      input: { docHash: data?.docHash || null, typeId: data?.typeId || null },
+    });
+    throw error;
   }
-
-  const ref = db.collection('doc_type_overrides').doc(`${puid}_${docHash}`);
-  await ref.set(
-    {
-      puid,
-      uid,
-      docHash,
-      typeId,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    },
-    { merge: true }
-  );
-
-  return { ok: true };
 });
 
 // Returns detected + override + effective document type state.
 exports.getDocumentTypeState = functions.https.onCall(async ({ data, ...context }) => {
-  const { uid, puid } = await getUserEntitlement(context);
+  try {
+    const { uid, puid } = await getUserEntitlement(context);
 
-  const docHash = data?.docHash;
-  validateDocHash(docHash);
+    const docHash = data?.docHash;
+    validateDocHash(docHash);
 
-  const overrideRef = db.collection('doc_type_overrides').doc(`${puid}_${docHash}`);
-  const detectedRef = db.collection('doc_classifications').doc(docHash);
+    const overrideRef = db.collection('doc_type_overrides').doc(`${puid}_${docHash}`);
+    const detectedRef = db.collection('doc_classifications').doc(docHash);
 
-  const [overrideSnap, detectedSnap] = await Promise.all([overrideRef.get(), detectedRef.get()]);
+    const [overrideSnap, detectedSnap] = await Promise.all([overrideRef.get(), detectedRef.get()]);
 
-  const overrideTypeId = overrideSnap.exists ? (overrideSnap.data()?.typeId || null) : null;
-  const detected = detectedSnap.exists ? (detectedSnap.data() || null) : null;
-  const detectedTypeId = detected?.typeId || null;
+    const overrideTypeId = overrideSnap.exists ? (overrideSnap.data()?.typeId || null) : null;
+    const detected = detectedSnap.exists ? (detectedSnap.data() || null) : null;
+    const detectedTypeId = detected?.typeId || null;
 
-  const effectiveTypeId = overrideTypeId || detectedTypeId || null;
+    const effectiveTypeId = overrideTypeId || detectedTypeId || null;
 
-  return {
-    ok: true,
-    uid,
-    puid,
-    docHash,
-    overrideTypeId,
-    detected,
-    effectiveTypeId,
-  };
+    return {
+      ok: true,
+      uid,
+      puid,
+      docHash,
+      overrideTypeId,
+      detected,
+      effectiveTypeId,
+    };
+  } catch (error) {
+    await logBackendException({
+      functionName: 'getDocumentTypeState',
+      error,
+      context,
+      input: { docHash: data?.docHash || null },
+    });
+    throw error;
+  }
 });
 
 // Cheap (non-AI) document type detection to seed routing; can be replaced by LLM later.
@@ -1141,81 +1529,91 @@ const getDocumentTypesIndex = async () => {
 };
 
 exports.detectDocumentType = functions.https.onCall(async ({ data, ...context }) => {
-  const { uid, puid, tier } = await getUserEntitlement(context);
+  try {
+    const { uid, puid, tier } = await getUserEntitlement(context);
 
-  const docHash = data?.docHash;
-  validateDocHash(docHash);
+    const docHash = data?.docHash;
+    validateDocHash(docHash);
 
-  const stats = data?.stats || {};
-  const pageCount = stats?.pageCount || 0;
-  const charsPerPage = Array.isArray(stats?.charsPerPage) ? stats.charsPerPage : [];
-  const totalChars = stats?.totalChars || 0;
+    const stats = data?.stats || {};
+    const pageCount = stats?.pageCount || 0;
+    const charsPerPage = Array.isArray(stats?.charsPerPage) ? stats.charsPerPage : [];
+    const totalChars = stats?.totalChars || 0;
 
-  const rawText = String(data?.text || '');
-  const text = rawText.slice(0, 250000); // hard cap
-  const lower = text.toLowerCase();
+    const rawText = String(data?.text || '');
+    const text = rawText.slice(0, 250000); // hard cap
+    const lower = text.toLowerCase();
 
-  const scanRatio = computeScanRatio(charsPerPage, pageCount);
+    const scanRatio = computeScanRatio(charsPerPage, pageCount);
 
-  let intakeCategory = 'GENERAL';
-  let typeId = null;
-  let confidence = 0.35;
-  let reasons = [];
+    let intakeCategory = 'GENERAL';
+    let typeId = null;
+    let confidence = 0.35;
+    let reasons = [];
 
-  if (!text.trim() || totalChars < 20) {
-    intakeCategory = 'UNREADABLE';
-    typeId = 'unreadable_empty';
-    confidence = 0.9;
-    reasons.push({ code: 'NO_TEXT', detail: 'No extractable text' });
-  } else if (scanRatio > CONFIG.SCAN_RATIO_THRESHOLD) {
-    // scanned documents often need OCR; don’t pretend we know the exact type
-    intakeCategory = 'GENERAL';
-    typeId = 'unreadable_broken';
-    confidence = 0.45;
-    reasons.push({ code: 'SCAN_LIKELY', detail: `scanRatio=${scanRatio.toFixed(2)}` });
-  } else if (/(\binvoice\b|\btax invoice\b|\babn\b|\bgst\b)/.test(lower)) {
-    intakeCategory = 'BUSINESS_LEGAL';
-    typeId = 'business_invoice';
-    confidence = 0.75;
-    reasons.push({ code: 'KEYWORDS', detail: 'invoice/tax invoice/gst' });
-  } else if (/(\boffer letter\b|\bjob offer\b|\bwe are pleased to offer\b|\bcommencement date\b|\bremuneration\b)/.test(lower)) {
-    intakeCategory = 'BUSINESS_LEGAL';
-    typeId = 'legal_job_offer';
-    confidence = 0.7;
-    reasons.push({ code: 'KEYWORDS', detail: 'job offer/offer letter/remuneration' });
-  } else if (/(\bsop\b|\bprocedure\b|\bwork instruction\b|\bstep\s+\d+\b)/.test(lower)) {
-    intakeCategory = 'GENERAL';
-    typeId = 'general_sop_procedure';
-    confidence = 0.65;
-    reasons.push({ code: 'KEYWORDS', detail: 'sop/procedure/work instruction' });
-  } else if (/(\bprivacy policy\b|\bpersonal information\b|\bdata collection\b)/.test(lower)) {
-    intakeCategory = 'BUSINESS_LEGAL';
-    typeId = 'policy_privacy';
-    confidence = 0.65;
-    reasons.push({ code: 'KEYWORDS', detail: 'privacy policy/data collection' });
-  } else {
-    intakeCategory = 'GENERAL';
-    typeId = 'legal_contract_generic';
-    confidence = 0.4;
-    reasons.push({ code: 'FALLBACK', detail: 'default fallback' });
+    if (!text.trim() || totalChars < 20) {
+      intakeCategory = 'UNREADABLE';
+      typeId = 'unreadable_empty';
+      confidence = 0.9;
+      reasons.push({ code: 'NO_TEXT', detail: 'No extractable text' });
+    } else if (scanRatio > CONFIG.SCAN_RATIO_THRESHOLD) {
+      // scanned documents often need OCR; don’t pretend we know the exact type
+      intakeCategory = 'GENERAL';
+      typeId = 'unreadable_broken';
+      confidence = 0.45;
+      reasons.push({ code: 'SCAN_LIKELY', detail: `scanRatio=${scanRatio.toFixed(2)}` });
+    } else if (/(\binvoice\b|\btax invoice\b|\babn\b|\bgst\b)/.test(lower)) {
+      intakeCategory = 'BUSINESS_LEGAL';
+      typeId = 'business_invoice';
+      confidence = 0.75;
+      reasons.push({ code: 'KEYWORDS', detail: 'invoice/tax invoice/gst' });
+    } else if (/(\boffer letter\b|\bjob offer\b|\bwe are pleased to offer\b|\bcommencement date\b|\bremuneration\b)/.test(lower)) {
+      intakeCategory = 'BUSINESS_LEGAL';
+      typeId = 'legal_job_offer';
+      confidence = 0.7;
+      reasons.push({ code: 'KEYWORDS', detail: 'job offer/offer letter/remuneration' });
+    } else if (/(\bsop\b|\bprocedure\b|\bwork instruction\b|\bstep\s+\d+\b)/.test(lower)) {
+      intakeCategory = 'GENERAL';
+      typeId = 'general_sop_procedure';
+      confidence = 0.65;
+      reasons.push({ code: 'KEYWORDS', detail: 'sop/procedure/work instruction' });
+    } else if (/(\bprivacy policy\b|\bpersonal information\b|\bdata collection\b)/.test(lower)) {
+      intakeCategory = 'BUSINESS_LEGAL';
+      typeId = 'policy_privacy';
+      confidence = 0.65;
+      reasons.push({ code: 'KEYWORDS', detail: 'privacy policy/data collection' });
+    } else {
+      intakeCategory = 'GENERAL';
+      typeId = 'legal_contract_generic';
+      confidence = 0.4;
+      reasons.push({ code: 'FALLBACK', detail: 'default fallback' });
+    }
+
+    const ref = db.collection('doc_classifications').doc(docHash);
+    await ref.set(
+      {
+        docHash,
+        intakeCategory,
+        typeId,
+        confidence,
+        reasons,
+        tier,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        model: 'heuristic-v1',
+      },
+      { merge: true }
+    );
+
+    return { ok: true, uid, puid, docHash, intakeCategory, typeId, confidence, reasons };
+  } catch (error) {
+    await logBackendException({
+      functionName: 'detectDocumentType',
+      error,
+      context,
+      input: { docHash: data?.docHash || null, stats: data?.stats || null },
+    });
+    throw error;
   }
-
-  const ref = db.collection('doc_classifications').doc(docHash);
-  await ref.set(
-    {
-      docHash,
-      intakeCategory,
-      typeId,
-      confidence,
-      reasons,
-      tier,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      model: 'heuristic-v1',
-    },
-    { merge: true }
-  );
-
-  return { ok: true, uid, puid, docHash, intakeCategory, typeId, confidence, reasons };
 });
 
 // Type-specific analysis entrypoint.
@@ -1285,8 +1683,10 @@ exports.analyzeByType = functions.https.onCall(async ({ data, ...context }) => {
 
   // Call Gemini for type-specific analysis
   let result;
+  let geminiModelName = getActiveGeminiModelName();
   try {
     const model = await getGeminiModel();
+    geminiModelName = getActiveGeminiModelName();
     const prompt = buildTypeSpecificPrompt(safeText, effectiveTypeId || 'document', validationSpec);
 
     const geminiResult = await model.generateContent({
@@ -1315,9 +1715,40 @@ exports.analyzeByType = functions.https.onCall(async ({ data, ...context }) => {
     };
   } catch (error) {
     console.error('Gemini analyzeByType failed:', error);
+    const rawMessage = safeString(error?.message, 'Unknown Gemini error');
+    const publicMessage = `Analysis failed: Gemini (${geminiModelName}). Returning basic metadata.`;
+    await logBackendException({
+      functionName: 'analyzeByType',
+      error,
+      context,
+      input: { docHash, effectiveTypeId, validationSlug },
+    });
+
+    try {
+      await logAdminAiEvent({
+        eventType: 'analyzeByType_error',
+        payload: {
+          provider: 'gemini',
+          model: geminiModelName,
+          severity: 'error',
+          uid,
+          puid,
+          tier,
+          docHash,
+          effectiveTypeId: effectiveTypeId || null,
+          validationSlug: validationSlug || null,
+          message: rawMessage.slice(0, 4000),
+          code: safeString(error?.code, null),
+          status: Number.isFinite(Number(error?.status)) ? Number(error.status) : null,
+        },
+      });
+    } catch (logError) {
+      console.error('Failed to write analyzeByType error to Firestore:', logError);
+    }
+
     // Fallback to basic result on error
     result = {
-      plainExplanation: `Analysis failed: ${error.message}. Returning basic metadata.`,
+      plainExplanation: publicMessage,
       extracted: {},
       checks: [],
     };
@@ -1392,8 +1823,58 @@ exports.cleanupOldUsageRecords = functions.scheduler.onSchedule('every day 01:00
     return null;
   } catch (error) {
     console.error('Cleanup error:', error);
+    await logBackendException({
+      functionName: 'cleanupOldUsageRecords',
+      error,
+      input: null,
+    });
     throw error;
   }
+});
+
+// Callable admin config write with auth + schema checks.
+exports.setAdminConfig = functions.https.onCall(async ({ data, ...context }) => {
+  validateAdminContext(context);
+
+  const docId = String(data?.docId || '').trim();
+  if (!ADMIN_CONFIG_DOC_IDS.includes(docId)) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      `docId must be one of: ${ADMIN_CONFIG_DOC_IDS.join(', ')}`
+    );
+  }
+
+  const payload = data?.config;
+  if (!ensurePlainObject(payload)) {
+    throw new functions.https.HttpsError('invalid-argument', 'config must be a JSON object');
+  }
+
+  const qpath = `admin/${docId}`;
+  const validationErrors = validateAdminConfigPayload({ qpath, data: payload });
+  if (validationErrors.length > 0) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Admin config validation failed',
+      { errors: validationErrors, qpath }
+    );
+  }
+
+  const shouldMerge = data?.merge !== false;
+  const docRef = db.doc(qpath);
+  await docRef.set(
+    {
+      ...payload,
+      _updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: shouldMerge }
+  );
+  const snap = await docRef.get();
+
+  return {
+    ok: true,
+    path: qpath,
+    data: snap.data(),
+  };
 });
 
 // ============================================================================
@@ -1403,10 +1884,11 @@ exports.getDocByPath = functions.https.onRequest(async (req, res) => {
   // Allow CORS for admin/dev tooling
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
 
   try {
+    await validateAdminRequest(req);
     const qpath = req.query.qpath;
 
     if (!qpath || typeof qpath !== "string") {
@@ -1440,6 +1922,18 @@ exports.getDocByPath = functions.https.onRequest(async (req, res) => {
 
   } catch (err) {
     console.error(err);
+    await logBackendException({
+      functionName: 'getDocByPath',
+      error: err,
+      input: { qpath: req?.query?.qpath || null },
+    });
+    if (err instanceof functions.https.HttpsError) {
+      const httpCode = err.code === 'unauthenticated' ? 401 : (err.code === 'permission-denied' ? 403 : 400);
+      return res.status(httpCode).json({
+        error: err.message,
+        details: err.details || null,
+      });
+    }
     return res.status(500).json({
       error: "Internal error"
     });
@@ -1455,7 +1949,7 @@ exports.setDocByPath = functions.https.onRequest(async (req, res) => {
   // CORS
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type, x-admin-secret');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
 
   if (req.method !== 'POST') {
@@ -1463,6 +1957,7 @@ exports.setDocByPath = functions.https.onRequest(async (req, res) => {
   }
 
   try {
+    await validateAdminRequest(req);
     const { qpath, data } = req.body || {};
 
     if (!qpath || typeof qpath !== 'string') {
@@ -1495,6 +1990,15 @@ exports.setDocByPath = functions.https.onRequest(async (req, res) => {
       });
     }
 
+    const validationErrors = validateAdminConfigPayload({ qpath, data });
+    if (validationErrors.length > 0) {
+      return res.status(400).json({
+        error: 'Admin config validation failed',
+        details: validationErrors,
+        path: qpath,
+      });
+    }
+
     // Merge-write so existing fields not in payload are preserved
     // merge defaults to true; pass "merge": false in body to overwrite entirely
     const shouldMerge = req.body.merge !== false;
@@ -1518,6 +2022,18 @@ exports.setDocByPath = functions.https.onRequest(async (req, res) => {
     });
   } catch (err) {
     console.error('setDocByPath error:', err);
+    await logBackendException({
+      functionName: 'setDocByPath',
+      error: err,
+      input: { qpath: req?.body?.qpath || null },
+    });
+    if (err instanceof functions.https.HttpsError) {
+      const httpCode = err.code === 'unauthenticated' ? 401 : (err.code === 'permission-denied' ? 403 : 400);
+      return res.status(httpCode).json({
+        error: err.message,
+        details: err.details || null,
+      });
+    }
     return res.status(500).json({ error: 'Internal error' });
   }
 });

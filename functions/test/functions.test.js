@@ -4,6 +4,7 @@ const test = require('firebase-functions-test')();
 
 const makeFirestoreStub = () => {
   const docs = new Map();
+  const adds = new Map();
 
   const getDocData = (path) => docs.get(path);
 
@@ -14,6 +15,18 @@ const makeFirestoreStub = () => {
   };
 
   return {
+    doc: (docPath) => ({
+      get: async () => {
+        const data = getDocData(docPath);
+        return {
+          exists: !!data,
+          data: () => data,
+        };
+      },
+      set: async (payload, options) => {
+        setDocData(docPath, payload, options);
+      },
+    }),
     collection: (name) => ({
       doc: (id) => {
         const path = `${name}/${id}`;
@@ -30,7 +43,12 @@ const makeFirestoreStub = () => {
           },
         };
       },
-      add: async () => ({ id: `mock-${Date.now()}` }),
+      add: async (payload) => {
+        const current = adds.get(name) || [];
+        current.push(payload);
+        adds.set(name, current);
+        return { id: `mock-${Date.now()}` };
+      },
       where: () => ({
         get: async () => ({
           forEach: () => {},
@@ -48,8 +66,11 @@ const makeFirestoreStub = () => {
     __seed: (path, data) => {
       docs.set(path, data);
     },
+    __get: (path) => docs.get(path),
+    __added: (collectionName) => adds.get(collectionName) || [],
     __clear: () => {
       docs.clear();
+      adds.clear();
     },
   };
 };
@@ -325,6 +346,92 @@ describe('DecoDocs Functions Unit Tests', () => {
       expect(result.entitlement.tier).to.equal('pro');
       expect(result.usage.estimatedTokens).to.equal(100000);
       expect(result.usage.remainingTokens).to.equal(null);
+    });
+  });
+
+  describe('setAdminConfig', () => {
+    it('rejects non-admin callers', async () => {
+      const wrapped = test.wrap(myFunctions.setAdminConfig);
+      try {
+        await wrapped({
+          data: { docId: 'flags', config: { enableOcr: true } },
+          auth: { uid: 'user-1', token: { email: 'user@example.com' } },
+        });
+        expect.fail('Expected permission-denied');
+      } catch (e) {
+        expect(e.code).to.equal('permission-denied');
+      }
+    });
+
+    it('rejects invalid stripe config payload', async () => {
+      const wrapped = test.wrap(myFunctions.setAdminConfig);
+      try {
+        await wrapped({
+          data: {
+            docId: 'stripe',
+            config: { apiKey: 'not-a-valid-key' },
+          },
+          auth: { uid: 'admin-1', token: { email: 'admin@snapsign.com.au' } },
+        });
+        expect.fail('Expected invalid-argument');
+      } catch (e) {
+        expect(e.code).to.equal('invalid-argument');
+        expect(e.details).to.have.property('errors');
+        expect(e.details.errors.join(' ')).to.contain('apiKey');
+      }
+    });
+
+    it('writes valid config docs', async () => {
+      const wrapped = test.wrap(myFunctions.setAdminConfig);
+      const result = await wrapped({
+        data: {
+          docId: 'flags',
+          config: { enableOcr: true, enableTypeSpecificAnalysis: false },
+        },
+        auth: { uid: 'admin-2', token: { email: 'ops@snapsign.com.au' } },
+      });
+
+      expect(result.ok).to.equal(true);
+      expect(result.path).to.equal('admin/flags');
+      const stored = firestoreStub.__get('admin/flags');
+      expect(stored.enableOcr).to.equal(true);
+      expect(stored.enableTypeSpecificAnalysis).to.equal(false);
+      expect(stored).to.have.property('_updatedAt');
+    });
+  });
+
+  describe('submitUserReport', () => {
+    it('accepts bug reports from anonymous users', async () => {
+      const wrapped = test.wrap(myFunctions.submitUserReport);
+      const result = await wrapped({
+        data: {
+          kind: 'bug',
+          message: 'Upload fails on Safari when selecting PDF from Files app.',
+          pageUrl: 'https://decodocs.com/view',
+          userAgent: 'Mozilla/5.0 test',
+        },
+      });
+
+      expect(result.ok).to.equal(true);
+      const writes = firestoreStub.__added('admin_reports');
+      expect(writes).to.have.length.greaterThan(0);
+      const last = writes[writes.length - 1];
+      expect(last.reportType).to.equal('user_bug');
+      expect(last.source).to.equal('web');
+      expect(last.status).to.equal('open');
+      expect(last.uid).to.equal(null);
+    });
+
+    it('rejects invalid kind values', async () => {
+      const wrapped = test.wrap(myFunctions.submitUserReport);
+      try {
+        await wrapped({
+          data: { kind: 'other', message: 'Some message that should fail' },
+        });
+        expect.fail('Expected invalid-argument');
+      } catch (e) {
+        expect(e.code).to.equal('invalid-argument');
+      }
     });
   });
 });

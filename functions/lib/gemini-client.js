@@ -4,8 +4,11 @@ const admin = require('firebase-admin');
 
 // Initialize Gemini API
 // Default model can be overridden via GEMINI_MODEL or Firestore admin/gemini(.model).
-const DEFAULT_MODEL_NAME = 'gemini-2.0-flash';
+const DEFAULT_MODEL_NAME = 'gemini-2.5-flash';
 const MODEL_NAME = DEFAULT_MODEL_NAME;
+const LEGACY_MODEL_ALIASES = {
+    'gemini-2.0-flash': DEFAULT_MODEL_NAME,
+};
 
 let genAI = null;
 let model = null;
@@ -16,6 +19,12 @@ const asNonEmptyString = (value) => {
     if (typeof value !== 'string') return '';
     const trimmed = value.trim();
     return trimmed.length > 0 ? trimmed : '';
+};
+
+const normalizeModelName = (value) => {
+    const model = asNonEmptyString(value);
+    if (!model) return DEFAULT_MODEL_NAME;
+    return LEGACY_MODEL_ALIASES[model] || model;
 };
 
 const getFirestore = () => {
@@ -45,10 +54,12 @@ const getGeminiConfigFromFirestore = async () => {
 
     return {
         key: asNonEmptyString(modeConfig?.key) || asNonEmptyString(doc.key),
-        model: asNonEmptyString(process.env.GEMINI_MODEL)
+        model: normalizeModelName(
+            asNonEmptyString(process.env.GEMINI_MODEL)
             || asNonEmptyString(modeConfig?.model)
             || asNonEmptyString(doc.model)
-            || DEFAULT_MODEL_NAME,
+            || DEFAULT_MODEL_NAME
+        ),
     };
 };
 
@@ -57,7 +68,7 @@ const resolveGeminiConfig = async () => {
     if (envKey) {
         return {
             key: envKey,
-            model: asNonEmptyString(process.env.GEMINI_MODEL) || DEFAULT_MODEL_NAME,
+            model: normalizeModelName(asNonEmptyString(process.env.GEMINI_MODEL) || DEFAULT_MODEL_NAME),
             source: 'GOOGLE_API_KEY',
         };
     }
@@ -66,7 +77,7 @@ const resolveGeminiConfig = async () => {
     if (runtimeKey) {
         return {
             key: runtimeKey,
-            model: asNonEmptyString(process.env.GEMINI_MODEL) || DEFAULT_MODEL_NAME,
+            model: normalizeModelName(asNonEmptyString(process.env.GEMINI_MODEL) || DEFAULT_MODEL_NAME),
             source: 'functions.config().gemini.key',
         };
     }
@@ -76,7 +87,7 @@ const resolveGeminiConfig = async () => {
         if (firestoreCfg?.key) {
             return {
                 key: firestoreCfg.key,
-                model: firestoreCfg.model || DEFAULT_MODEL_NAME,
+                model: normalizeModelName(firestoreCfg.model || DEFAULT_MODEL_NAME),
                 source: 'Firestore admin/gemini.key (logical path /admin/gemini/key)',
             };
         }
@@ -86,7 +97,7 @@ const resolveGeminiConfig = async () => {
 
     return {
         key: '',
-        model: asNonEmptyString(process.env.GEMINI_MODEL) || DEFAULT_MODEL_NAME,
+        model: normalizeModelName(asNonEmptyString(process.env.GEMINI_MODEL) || DEFAULT_MODEL_NAME),
         source: null,
     };
 };
@@ -124,7 +135,12 @@ async function getGeminiModel() {
     }
 }
 
+function getResolvedGeminiModelName() {
+    return normalizeModelName(resolvedModelName || DEFAULT_MODEL_NAME);
+}
+
 module.exports = {
     getGeminiModel,
+    getResolvedGeminiModelName,
     MODEL_NAME
 };

@@ -1,5 +1,12 @@
 # Quick Implementation Checklist - AI Analysis
 
+> Status: `working` checklist
+>
+> This file is a tactical checklist companion to:
+> - `AI_ANALYSIS_IMPLEMENTATION_PLAN.md`
+> - `docs/FUNCTIONS_IMPLEMENTATION.md`
+> - `Decodocs/docs/API.md`
+
 ## Summary
 DecoDocs backend AI functions are implemented. Remaining work is **integration alignment**, **UI completion**, and **documentation/test updates**.
 

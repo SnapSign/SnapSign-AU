@@ -1,5 +1,12 @@
 # MASTERMIND.md - Project Overview and Strategic Direction
 
+> Status: `snapshot` (strategy notes)
+>
+> This file is not a canonical product/engineering spec.  
+> Canonical docs live in:
+> - `../docs/README.md` (documentation system)
+> - `../Decodocs/docs/README.md` (DecoDocs canonical docs)
+
 This document serves as the central hub for understanding the SnapSign/DecoDocs project ecosystem, strategic direction, and key components.
 
 ## Developer's Other Projects

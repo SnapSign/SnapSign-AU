@@ -1,5 +1,12 @@
 # DecoDocs AI Analysis - Executive Summary
 
+> Status: `snapshot` (point-in-time summary)
+>
+> Canonical references for current behavior:
+> - `docs/FUNCTIONS_IMPLEMENTATION.md`
+> - `Decodocs/docs/API.md`
+> - `Decodocs/docs/STATUS_SUMMARY.md`
+
 **Date:** February 16, 2026  
 **Project:** Complete AI Analysis Functionality  
 **Status:** 🔄 Backend Implemented - Integration Alignment In Progress

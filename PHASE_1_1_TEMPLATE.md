@@ -1,5 +1,11 @@
 # Phase 1.1: Fix `analyzeText` Function - Implementation Template
 
+> Status: `snapshot/template`
+>
+> Use this as historical implementation context. Current behavior/spec authority:
+> - `docs/FUNCTIONS_IMPLEMENTATION.md`
+> - `Decodocs/docs/API.md`
+
 ## Overview
 Replace hardcoded mock data in `functions/index.js:317` with real Gemini API integration.
 
@@ -453,4 +459,3 @@ console.log('Gemini raw response:', response.response.text());
 ---
 
 **Next Step:** After completing this, move to Phase 1.2 - Implement `explainSelection`
-

@@ -24,5 +24,17 @@ service cloud.firestore {
       // Deny client writes - only functions can write
       allow create, read, update, delete: if false;
     }
+
+    // Admin-only AI event feed (written by Cloud Functions).
+    match /admin_ai_events/{docId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    // Unified admin reports feed (backend exceptions + user feedback/bug reports).
+    match /admin_reports/{docId} {
+      allow read, update, delete: if isAdmin();
+      allow create: if false;
+    }
   }
 }

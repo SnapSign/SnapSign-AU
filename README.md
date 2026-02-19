@@ -1,212 +1,94 @@
-# DecoDocs/SnapSign - Document Analysis Platform
+# SnapSign-AU Umbrella Repository
 
-## Overview
-DecoDocs is a document analysis platform that uses AI to help users understand complex legal documents, contracts, and terms. The platform provides plain-English explanations of legal jargon, highlights potential risks, and identifies important clauses. DecoDocs shares the same Firebase project (`snapsign-au`) as SnapSign, enabling unified authentication, data, and analytics.
+Deployment umbrella for Firebase project `snapsign-au`:
+- Hosting for `snapsign.com.au`
+- Hosting for `decodocs.com` static output
+- Hosting for DecoDocs admin static output
+- Shared Cloud Functions + Firestore rules/indexes
 
-## Architecture
-- **Frontend**: React/Vite application with PDF.js for client-side text extraction
-- **Backend**: Firebase Functions for AI processing and authentication
-- **Database**: Firestore for usage metrics (no document content stored)
-- **Authentication**: Firebase Anonymous Auth for privacy-focused experience
-- **Hosting**: Firebase Hosting for static assets
+`Decodocs/` is a nested independent git repository and must remain separate.
 
-## Features
-- Anonymous document analysis (no account required)
-- Client-side PDF text extraction
-- Document fingerprinting using SHA-256 hashing
-- Client-side `.snapsign` envelope handling (JSZip)
-- AI-powered document analysis with plain-English explanations
-- Risk identification and categorization
-- Interactive document viewer with highlights
-- Usage tracking and plan enforcement
+## Repository Map
 
-## Development Setup
+- `firebase.json` - hosting/functions/rules wiring
+- `functions/` - shared gen2 Functions runtime
+- `snapsign.com.au/` - SnapSign marketing/site app
+- `Decodocs/web/` - DecoDocs web app source (build output: `Decodocs/web/decodocs.com/`)
+- `Decodocs/admin/` - DecoDocs admin app (build output: `Decodocs/admin/dist/`)
+- `Decodocs/docs/` - canonical DecoDocs product/technical docs
 
-### Prerequisites
-- Node.js 18+
-- Firebase CLI tools
-- npm or yarn
+## Hosting Targets
 
-### Installation
+Defined in `firebase.json`:
+1. `snapsign-au` -> `snapsign.com.au/dist`
+2. `decodocs-site` -> `Decodocs/web/decodocs.com`
+3. `decodocs-admin` -> `Decodocs/admin/dist`
+
+## Documentation
+
+- Documentation system and ownership: `docs/README.md`
+- Curated index of docs: `DOCS_INDEX.md`
+- DecoDocs docs entrypoint: `Decodocs/docs/README.md`
+- DecoDocs nested repo overview: `Decodocs/README.md`
+
+## Development Quick Start
+
+Prerequisites:
+- Node.js 22+ (functions engine is Node 22)
+- npm
+- Firebase CLI
+
+Install deps:
 ```bash
-# Install dependencies
-cd decodocs/web
-npm install
-
-# Install functions dependencies
-cd ../../functions
-npm install
+npm --prefix snapsign.com.au ci
+npm --prefix Decodocs/web ci
+npm --prefix Decodocs/admin ci
+npm --prefix functions ci
 ```
 
-### Environment Configuration
-Create a `.env` file in the `decodocs/web` directory with your Firebase configuration. To get the actual values for your `snapsign-au` Firebase project:
-
-1. Go to the [Firebase Console](https://console.firebase.google.com/)
-2. Select your `snapsign-au` project
-3. Navigate to Project Settings (gear icon)
-4. Scroll down to the "Your apps" section
-5. Click the "</>" icon to add a web app (register the DecoDocs web app)
-6. Copy the configuration values and add them to your `.env` file:
-
-```env
-VITE_FIREBASE_API_KEY=
-VITE_FIREBASE_AUTH_DOMAIN=
-VITE_FIREBASE_PROJECT_ID=
-VITE_FIREBASE_STORAGE_BUCKET=
-VITE_FIREBASE_MESSAGING_SENDER_ID=
-VITE_FIREBASE_APP_ID=
-```
-
-### Running Locally
+Local app dev (typical):
 ```bash
-# Start Firebase emulators
+npm --prefix Decodocs/web run dev
+npm --prefix Decodocs/admin run dev
+npm --prefix snapsign.com.au run dev
 firebase emulators:start
-
-# In another terminal, start the development server
-cd decodocs/web
-npm run dev
 ```
 
-## API Endpoints
+## Build And Deploy
 
-### Firebase Functions
-- `preflightCheck`: Classify documents and estimate AI usage without calling AI
-- `analyzeText`: Perform main document analysis
-- `explainSelection`: Explain selected document text in plain language
-- `highlightRisks`: Identify and structure document risks
-- `translateToPlainEnglish`: Convert legal text to plain English
-- `analyzeByType`: Run type-specific analysis using detected/overridden document type
-- `detectDocumentType`: Classify document category/type
-- `getDocumentTypeState`: Return detected/override/effective type state
-- `saveDocTypeOverride`: Persist per-user type override
-- `getEntitlement`: Retrieve user plan and limits
-
-### Envelope Handling (Client-Side)
-- `.snapsign` is a ZIP container processed in the browser (no envelope HTTP endpoint in Functions).
-- Implemented in `Decodocs/web/src/services/envelopeService.js`.
-- Supports:
-  - create envelope from PDF
-  - extract/validate envelope
-  - embed optional `analysis.json` and `audit.json`
-- Core container files:
-  - `document.pdf`
-  - `manifest.json` (includes document SHA-256)
-
-### Authentication
-- Anonymous authentication required for all AI operations
-- Document fingerprinting using SHA-256 of PDF bytes
-- Usage tracked per (userId + documentHash) combination
-
-## Security
-- Client-side text extraction ensures documents never leave the browser
-- Client-side envelope extraction/validation keeps raw documents in browser for free flow
-- Anonymous authentication protects user privacy
-- Firestore security rules prevent unauthorized access
-- Usage limits enforce fair use policies
-
-## Testing
-
-### Running Tests
+Primary workflow:
 ```bash
-# Run function unit tests
-cd functions
-npm run test:unit
-
-# Run all tests
-npm run test
-```
-
-Tests cover:
-- Function input validation
-- Document classification logic
-- AI call limit enforcement
-- Security rule compliance
-- Error handling scenarios
-
-## Deployment
-
-### Recommended: Unified Build + Deploy Script
-Use the root script `./build-and-deploy.sh` to build all dependent projects and deploy from one command.
-
-The script runs from repo root and orchestrates:
-1. Optional semver bump in all project `package.json` files (`patch`, `minor`, `major`)
-2. `npm ci` in:
-   - `snapsign.com.au/`
-   - `Decodocs/web/`
-   - `Decodocs/admin/`
-   - `functions/`
-3. Build/version steps:
-   - `snapsign.com.au`: `npm run build`
-   - `Decodocs/web`: `npm run build`
-   - `Decodocs/admin`: `npm run build`
-   - `functions`: `npm run version:write`
-4. Output validation:
-   - `snapsign.com.au/dist/`
-   - `Decodocs/web/decodocs.com/`
-   - `Decodocs/admin/dist/`
-5. Firebase deploy (default targets): `functions,hosting,firestore`
-
-### Common Usage
-```bash
-# Build + deploy everything
 ./build-and-deploy.sh
+```
 
-# Bump patch version across all projects, then build + deploy
-./build-and-deploy.sh --bump patch
-
-# Build only (no deploy)
+Common alternatives:
+```bash
 ./build-and-deploy.sh --skip-deploy
-
-# Deploy only (skip install and build)
 ./build-and-deploy.sh --skip-install --skip-build
-
-# Override Firebase project
-./build-and-deploy.sh --project snapsign-au
-
-# Deploy selected targets only
 ./build-and-deploy.sh --only hosting
 ```
 
-### Options
-- `--skip-install`: skip dependency install (`npm ci`)
-- `--skip-build`: skip build/version steps
-- `--skip-deploy`: skip Firebase deploy
-- `--bump <patch|minor|major>`: bump versions in all project `package.json` files
-- `--project <projectId>`: override Firebase project id
-- `--only <targets>`: Firebase deploy targets (default: `functions,hosting,firestore`)
-- `-h, --help`: print help
-
-### Version Metadata Notes
-Version metadata is generated by custom scripts (not `genversion`):
-- `snapsign.com.au/scripts/write-version.mjs` writes `snapsign.com.au/src/lib/version.js`
-- `Decodocs/web/scripts/write-version.mjs` writes `Decodocs/web/src/lib/version.js`
-- `Decodocs/admin/scripts/write-version.mjs` writes `Decodocs/admin/src/lib/version.js`
-- `functions/scripts/write-version.mjs` writes `functions/lib/version.js`
-
-Each generated version string includes the package version and build metadata (git SHA/time), so version files may change on each build.
-
-### Manual Firebase Deploy (Fallback)
+Manual fallback:
 ```bash
 firebase deploy --only functions
 firebase deploy --only hosting
 firebase deploy --only firestore:rules
 ```
 
-## Data Model
-Firestore collections:
-- `usage_docs`: Per-user, per-document usage tracking (no content stored)
-- `usage_events`: Event logging for analytics (no content stored)
+## Platform Constraints
 
-## Privacy
-- Documents are processed client-side only
-- No document content is stored on servers
-- Anonymous authentication preserves user privacy
-- Usage data is retained temporarily and then purged
+This repository intentionally uses simple static hosting + basic functions:
+- No SSR/App Hosting/webframework auto-hosting
+- No Cloud Build-triggered advanced hosting flows
+- Hosting always points at built static directories
+- Functions remain in a single shared `functions/` directory
 
-## Technologies Used
-- React/Vite for frontend
-- Firebase Functions for backend
-- Firestore for data persistence
-- PDF.js for PDF processing
-- Tailwind CSS for styling
-- Gemini AI for document analysis
+## Config Policy (No `.env*` Files)
+
+- `.env`, `.env.local`, `.env.production`, and similar env files are not used in this repository.
+- Do not introduce dotenv loaders or `.env*`-based workflows in code, scripts, or docs.
+- Runtime configuration must come from:
+  - Firebase/Firestore admin config documents, or
+  - standard process environment provided by the execution platform (CI, Firebase runtime, shell), without local env files.
+
+See `AGENTS.md` for enforcement details and policy rationale.

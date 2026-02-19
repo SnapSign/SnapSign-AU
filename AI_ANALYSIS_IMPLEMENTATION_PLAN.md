@@ -1,5 +1,12 @@
 # DecoDocs AI Analysis Implementation Plan
 
+> Status: `working` (active implementation plan)
+>
+> Canonical specs:
+> - `docs/FUNCTIONS_IMPLEMENTATION.md`
+> - `Decodocs/docs/API.md`
+> - `Decodocs/docs/DECISIONS.md`
+
 **Date:** February 16, 2026  
 **Status:** In Progress - Backend Implemented, Integration/Docs Alignment Needed
 

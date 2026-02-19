@@ -64,14 +64,6 @@
           "destination": "/app/index.html"
         },
         {
-          "source": "/privacy{,/**}",
-          "destination": "/app/index.html"
-        },
-        {
-          "source": "/terms{,/**}",
-          "destination": "/app/index.html"
-        },
-        {
           "source": "/contact{,/**}",
           "destination": "/app/index.html"
         },

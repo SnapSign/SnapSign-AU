@@ -30,6 +30,12 @@ Firebase Hosting targets in `firebase.json` and their public directories are:
 
 ---
 
+## Canonical deployment script
+- The canonical, repo-root deployment entrypoint is `./test-build-deploy.sh`. Use this script to run tests, build all subprojects, verify outputs, and deploy Firebase targets from the repository root.
+- Typical usage: `./test-build-deploy.sh` (options: `--skip-install`, `--skip-build`, `--skip-tests`, `--skip-deploy`, `--bump <patch|minor|major>`, `--project <id>`, `--only <targets>`).
+- CI pipelines and operators MUST prefer `test-build-deploy.sh` over ad-hoc `firebase deploy` or per-subproject deploys to ensure consistent, verified builds and hosting paths.
+- Local per-subproject `npm run build` is acceptable for development, but production/integration deploys must use `test-build-deploy.sh`.
+
 If a deployment ever requests Blaze/Cloud Build/Artifact Registry for basic static hosting, review firebase.json and eliminate non-static or SSR/Next.js features. Cloud Build and Artifact Registry must remain disabled unless absolutely necessary for a critical feature.
 
 ## Admin config helpers and paths
@@ -50,3 +56,7 @@ If a deployment ever requests Blaze/Cloud Build/Artifact Registry for basic stat
 - Allowed config sources:
   - Firestore admin config documents (preferred for product/runtime config), and
   - platform-provided process environment (CI/Firebase runtime/shell), without local env files.
+
+## Documentation & project context
+- Both code changes and copywriting (docs, UI text, marketing copy) require project-level understanding. Before making non-trivial technical or content changes, consult `DOCS_INDEX.md` for the curated entry points, architecture overviews, runbooks, and owner contacts.
+- Use the index to find the canonical doc for the area you are changing and to identify the right owner(s) to review copy or implementation updates.

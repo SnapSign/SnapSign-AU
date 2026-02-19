@@ -10,6 +10,7 @@ const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/clien
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { isProFlagEnabled } = require('./lib/entitlement');
 const { normalizeObjectKey, assertUserScopedKey } = require('./lib/storage-access');
+const { AdminReportsLogger } = require('./lib/admin-reports');
 const geminiClient = require('./lib/gemini-client');
 const { getGeminiModel } = geminiClient;
 const { buildAnalysisPrompt, buildExplanationPrompt, buildRiskPrompt, buildTranslationPrompt, buildTypeSpecificPrompt } = require('./lib/prompts');
@@ -50,6 +51,7 @@ if (admin.apps.length === 0) {
 }
 
 const db = admin.firestore();
+const adminReportsLogger = new AdminReportsLogger({ db, admin });
 
 const ADMIN_EMAIL_DOMAIN = '@snapsign.com.au';
 const ADMIN_CONFIG_DOC_IDS = ['stripe', 'plans', 'flags', 'policies'];
@@ -72,7 +74,6 @@ const CONFIG = {
 };
 
 const ADMIN_AI_EVENTS_COLLECTION = 'admin_ai_events';
-const ADMIN_REPORTS_COLLECTION = 'admin_reports';
 const DEFAULT_GEMINI_MODEL_NAME = 'gemini-2.5-flash';
 
 // Function to validate auth context
@@ -391,15 +392,7 @@ const validateOutputSchema = (result) => {
   return result;
 };
 
-const safeString = (value, fallback = '') => {
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    if (trimmed) return trimmed;
-  }
-  if (value === null || value === undefined) return fallback;
-  const asText = String(value).trim();
-  return asText || fallback;
-};
+const safeString = (...args) => adminReportsLogger.safeString(...args);
 
 const getActiveGeminiModelName = () => {
   if (typeof geminiClient.getResolvedGeminiModelName === 'function') {
@@ -416,61 +409,36 @@ const logAdminAiEvent = async ({ eventType, payload }) => {
   });
 };
 
-const redactSensitive = (key, value) => {
-  const lowered = String(key || '').toLowerCase();
-  const sensitiveFragments = ['text', 'content', 'selection', 'pdf', 'base64', 'raw'];
-  if (sensitiveFragments.some((fragment) => lowered.includes(fragment))) {
-    return '[REDACTED]';
-  }
-  return value;
-};
-
-const sanitizeReportValue = (value, depth = 0) => {
-  if (depth > 4) return '[TRUNCATED]';
-  if (value === null || value === undefined) return null;
-  if (typeof value === 'string') return value.slice(0, 3000);
-  if (typeof value === 'number' || typeof value === 'boolean') return value;
-  if (Array.isArray(value)) return value.slice(0, 20).map((item) => sanitizeReportValue(item, depth + 1));
-  if (typeof value === 'object') {
-    const out = {};
-    for (const [k, v] of Object.entries(value).slice(0, 40)) {
-      out[k] = sanitizeReportValue(redactSensitive(k, v), depth + 1);
-    }
-    return out;
-  }
-  return String(value).slice(0, 500);
-};
+const sanitizeReportValue = (...args) => adminReportsLogger.sanitizeReportValue(...args);
 
 const logAdminReport = async (report) => {
-  await db.collection(ADMIN_REPORTS_COLLECTION).add({
-    status: 'open',
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    ...report,
-  });
+  await adminReportsLogger.logAdminReport(report);
 };
 
 const logBackendException = async ({ functionName, error, context = null, input = null }) => {
-  try {
-    const token = context?.auth?.token || {};
-    await logAdminReport({
-      reportType: 'backend_exception',
-      source: 'functions',
-      severity: 'error',
-      functionName: safeString(functionName, 'unknown'),
-      message: safeString(error?.message, 'Unknown error'),
-      code: safeString(error?.code, null),
-      statusCode: Number.isFinite(Number(error?.status)) ? Number(error.status) : null,
-      stack: safeString(error?.stack, '').slice(0, 6000),
-      uid: context?.auth?.uid || null,
-      email: token?.email || null,
-      authProvider: token?.firebase?.sign_in_provider || null,
-      input: sanitizeReportValue(input || null),
-    });
-  } catch (loggingError) {
-    console.error('Failed to log backend exception:', loggingError);
-  }
+  await adminReportsLogger.logBackendException({ functionName, error, context, input });
 };
+
+if (!global.__SNAPSIGN_PROCESS_ERROR_LOGGER_ATTACHED__) {
+  global.__SNAPSIGN_PROCESS_ERROR_LOGGER_ATTACHED__ = true;
+
+  process.on('unhandledRejection', async (reason) => {
+    const error = reason instanceof Error ? reason : new Error(safeString(reason, 'Unhandled rejection'));
+    await logBackendException({
+      functionName: 'process.unhandledRejection',
+      error,
+      input: null,
+    });
+  });
+
+  process.on('uncaughtException', async (error) => {
+    await logBackendException({
+      functionName: 'process.uncaughtException',
+      error,
+      input: null,
+    });
+  });
+}
 
 const normalizeReportKind = (kind) => {
   const normalized = String(kind || '').trim().toLowerCase();
@@ -871,40 +839,109 @@ exports.getEntitlement = functions.https.onCall(async ({ data, ...context }) => 
 
 // Public report intake from web UI (feedback + bug reports).
 exports.submitUserReport = functions.https.onCall(async ({ data, ...context }) => {
-  const kind = normalizeReportKind(data?.kind);
-  if (!kind) {
-    throw new functions.https.HttpsError('invalid-argument', 'kind must be "feedback" or "bug"');
+  try {
+    const kind = normalizeReportKind(data?.kind);
+    if (!kind) {
+      throw new functions.https.HttpsError('invalid-argument', 'kind must be "feedback" or "bug"');
+    }
+
+    const message = safeString(data?.message, '');
+    if (message.length < 8) {
+      throw new functions.https.HttpsError('invalid-argument', 'message must be at least 8 characters');
+    }
+    if (message.length > 5000) {
+      throw new functions.https.HttpsError('invalid-argument', 'message is too long');
+    }
+
+    const pageUrl = safeString(data?.pageUrl, '');
+    const userAgent = safeString(data?.userAgent, '');
+    const extra = sanitizeReportValue(data?.extra || null);
+    const token = context?.auth?.token || {};
+
+    const reportType = kind === 'bug' ? 'user_bug' : 'user_feedback';
+    await logAdminReport({
+      reportType,
+      source: 'web',
+      severity: kind === 'bug' ? 'warning' : 'info',
+      functionName: 'submitUserReport',
+      message,
+      pageUrl: pageUrl || null,
+      userAgent: userAgent || null,
+      uid: context?.auth?.uid || null,
+      email: token?.email || null,
+      authProvider: token?.firebase?.sign_in_provider || null,
+      input: extra,
+    });
+
+    return { ok: true };
+  } catch (error) {
+    await logBackendException({
+      functionName: 'submitUserReport',
+      error,
+      context,
+      input: { kind: data?.kind || null, pageUrl: data?.pageUrl || null },
+    });
+    throw error;
   }
+});
 
-  const message = safeString(data?.message, '');
-  if (message.length < 8) {
-    throw new functions.https.HttpsError('invalid-argument', 'message must be at least 8 characters');
+// Public crash intake from web/admin global error handlers.
+exports.submitClientCrash = functions.https.onCall(async ({ data, ...context }) => {
+  try {
+    const sourceRaw = safeString(data?.source, 'unknown').toLowerCase();
+    const source = ['web', 'admin'].includes(sourceRaw) ? sourceRaw : 'unknown';
+    const eventType = safeString(data?.eventType, 'unknown');
+    const message = safeString(data?.message, '');
+
+    if (!message) {
+      throw new functions.https.HttpsError('invalid-argument', 'message is required');
+    }
+    if (message.length > 5000) {
+      throw new functions.https.HttpsError('invalid-argument', 'message is too long');
+    }
+
+    const token = context?.auth?.token || {};
+    const normalizedExtra = sanitizeReportValue(data?.extra || null);
+
+    await adminReportsLogger.logClientException({
+      source,
+      context,
+      eventType,
+      message,
+      stack: safeString(data?.stack, ''),
+      errorName: safeString(data?.errorName, null),
+      pageUrl: safeString(data?.pageUrl, null),
+      userAgent: safeString(data?.userAgent, null),
+      extra: normalizedExtra,
+    });
+
+    // Keep a dedicated crash intake collection for easier incident triage from web/admin.
+    await db.collection('crashes').add({
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      source,
+      eventType,
+      message,
+      stack: safeString(data?.stack, '').slice(0, 6000),
+      errorName: safeString(data?.errorName, null),
+      pageUrl: safeString(data?.pageUrl, null),
+      userAgent: safeString(data?.userAgent, null),
+      uid: context?.auth?.uid || null,
+      email: token?.email || null,
+      authProvider: token?.firebase?.sign_in_provider || null,
+      extra: normalizedExtra,
+    });
+
+    return { ok: true };
+  } catch (error) {
+    await logBackendException({
+      functionName: 'submitClientCrash',
+      error,
+      context,
+      input: { source: data?.source || null, eventType: data?.eventType || null },
+    });
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', 'Failed to submit client crash');
   }
-  if (message.length > 5000) {
-    throw new functions.https.HttpsError('invalid-argument', 'message is too long');
-  }
-
-  const pageUrl = safeString(data?.pageUrl, '');
-  const userAgent = safeString(data?.userAgent, '');
-  const extra = sanitizeReportValue(data?.extra || null);
-  const token = context?.auth?.token || {};
-
-  const reportType = kind === 'bug' ? 'user_bug' : 'user_feedback';
-  await logAdminReport({
-    reportType,
-    source: 'web',
-    severity: kind === 'bug' ? 'warning' : 'info',
-    functionName: 'submitUserReport',
-    message,
-    pageUrl: pageUrl || null,
-    userAgent: userAgent || null,
-    uid: context?.auth?.uid || null,
-    email: token?.email || null,
-    authProvider: token?.firebase?.sign_in_provider || null,
-    input: extra,
-  });
-
-  return { ok: true };
 });
 
 // --- MinIO / S3 (Firestore-backed config, no env secrets) ---
@@ -1619,7 +1656,8 @@ exports.detectDocumentType = functions.https.onCall(async ({ data, ...context })
 // Type-specific analysis entrypoint.
 // NOTE: currently returns validation spec + metadata (AI execution will be wired in next).
 exports.analyzeByType = functions.https.onCall(async ({ data, ...context }) => {
-  const { uid, puid, tier } = await getUserEntitlement(context);
+  try {
+    const { uid, puid, tier } = await getUserEntitlement(context);
 
   const docHash = data?.docHash;
   validateDocHash(docHash);
@@ -1679,7 +1717,6 @@ exports.analyzeByType = functions.https.onCall(async ({ data, ...context }) => {
   }
 
   const safeText = text;
-  const lower = safeText.toLowerCase();
 
   // Call Gemini for type-specific analysis
   let result;
@@ -1769,27 +1806,37 @@ exports.analyzeByType = functions.https.onCall(async ({ data, ...context }) => {
     },
   });
 
-  return {
-    ok: true,
-    uid,
-    puid,
-    tier,
-    docHash,
-    overrideTypeId,
-    detectedTypeId,
-    effectiveTypeId,
-    validationSlug,
-    validationSpec,
-    result,
-    stats: {
-      textChars: text.length,
-    },
-    usage: {
-      estimatedTokens,
-      remainingTokens: budget.remaining,
-    },
-    message: 'Type-specific analysis performed by Gemini.',
-  };
+    return {
+      ok: true,
+      uid,
+      puid,
+      tier,
+      docHash,
+      overrideTypeId,
+      detectedTypeId,
+      effectiveTypeId,
+      validationSlug,
+      validationSpec,
+      result,
+      stats: {
+        textChars: text.length,
+      },
+      usage: {
+        estimatedTokens,
+        remainingTokens: budget.remaining,
+      },
+      message: 'Type-specific analysis performed by Gemini.',
+    };
+  } catch (error) {
+    await logBackendException({
+      functionName: 'analyzeByType',
+      error,
+      context,
+      input: { docHash: data?.docHash || null },
+    });
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', 'Failed to analyze by type');
+  }
 });
 
 exports.cleanupOldUsageRecords = functions.scheduler.onSchedule('every day 01:00', {
@@ -1834,47 +1881,57 @@ exports.cleanupOldUsageRecords = functions.scheduler.onSchedule('every day 01:00
 
 // Callable admin config write with auth + schema checks.
 exports.setAdminConfig = functions.https.onCall(async ({ data, ...context }) => {
-  validateAdminContext(context);
+  try {
+    validateAdminContext(context);
 
-  const docId = String(data?.docId || '').trim();
-  if (!ADMIN_CONFIG_DOC_IDS.includes(docId)) {
-    throw new functions.https.HttpsError(
-      'invalid-argument',
-      `docId must be one of: ${ADMIN_CONFIG_DOC_IDS.join(', ')}`
+    const docId = String(data?.docId || '').trim();
+    if (!ADMIN_CONFIG_DOC_IDS.includes(docId)) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        `docId must be one of: ${ADMIN_CONFIG_DOC_IDS.join(', ')}`
+      );
+    }
+
+    const payload = data?.config;
+    if (!ensurePlainObject(payload)) {
+      throw new functions.https.HttpsError('invalid-argument', 'config must be a JSON object');
+    }
+
+    const qpath = `admin/${docId}`;
+    const validationErrors = validateAdminConfigPayload({ qpath, data: payload });
+    if (validationErrors.length > 0) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'Admin config validation failed',
+        { errors: validationErrors, qpath }
+      );
+    }
+
+    const shouldMerge = data?.merge !== false;
+    const docRef = db.doc(qpath);
+    await docRef.set(
+      {
+        ...payload,
+        _updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: shouldMerge }
     );
+    const snap = await docRef.get();
+
+    return {
+      ok: true,
+      path: qpath,
+      data: snap.data(),
+    };
+  } catch (error) {
+    await logBackendException({
+      functionName: 'setAdminConfig',
+      error,
+      context,
+      input: { docId: data?.docId || null, merge: data?.merge },
+    });
+    throw error;
   }
-
-  const payload = data?.config;
-  if (!ensurePlainObject(payload)) {
-    throw new functions.https.HttpsError('invalid-argument', 'config must be a JSON object');
-  }
-
-  const qpath = `admin/${docId}`;
-  const validationErrors = validateAdminConfigPayload({ qpath, data: payload });
-  if (validationErrors.length > 0) {
-    throw new functions.https.HttpsError(
-      'invalid-argument',
-      'Admin config validation failed',
-      { errors: validationErrors, qpath }
-    );
-  }
-
-  const shouldMerge = data?.merge !== false;
-  const docRef = db.doc(qpath);
-  await docRef.set(
-    {
-      ...payload,
-      _updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    },
-    { merge: shouldMerge }
-  );
-  const snap = await docRef.get();
-
-  return {
-    ok: true,
-    path: qpath,
-    data: snap.data(),
-  };
 });
 
 // ============================================================================

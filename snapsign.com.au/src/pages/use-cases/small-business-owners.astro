@@ -1,0 +1,52 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SiteHeader from "../../components/SiteHeader.astro";
+import FeedbackCTA from "../../components/FeedbackCTA.astro";
+
+const title = "Small Business Owner Contracts | Snap Sign Use Case";
+const description = "Review contracts that affect cash flow and founder risk: guarantees, renewals, liability, payments, and IP terms.";
+const canonical = "https://snapsign.com.au/use-cases/small-business-owners/";
+---
+<BaseLayout title={title} description={description} canonical={canonical} ogUrl={canonical}>
+  <div class="container">
+    <SiteHeader />
+
+    <section class="page-hero">
+      <span class="eyebrow">Use case</span>
+      <h1>Small Business Owners</h1>
+      <h2>Understand commitments before they become expensive operations issues.</h2>
+      <a href="https://decodocs.com/?entry_problem=small_business_owners&utm_source=snapsign.com.au&utm_medium=use_case&utm_campaign=small_business_owners" class="button">Decode a business contract</a>
+    </section>
+
+    <section class="problem-section">
+      <h3>Common contracts</h3>
+      <ul>
+        <li>Commercial leases</li>
+        <li>Vendor and supplier agreements</li>
+        <li>Equipment finance contracts</li>
+        <li>Software subscriptions and service terms</li>
+        <li>Distribution and partnership agreements</li>
+      </ul>
+    </section>
+
+    <section class="how-section">
+      <h3>Clauses that impact cash flow and owner downside</h3>
+      <ul>
+        <li><strong>Auto-renewal traps:</strong> silent renewal into higher-price terms.</li>
+        <li><strong>Personal guarantee clauses:</strong> owner liability tied to business commitments.</li>
+        <li><strong>Unlimited liability:</strong> uncapped exposure from ordinary contract breaches.</li>
+        <li><strong>Payment terms:</strong> front-loaded payments, late fee ladders, and strict offsets.</li>
+        <li><strong>Termination penalties:</strong> payout obligations when exiting early.</li>
+        <li><strong>IP transfer:</strong> assignment language that captures internal know-how.</li>
+      </ul>
+    </section>
+
+    <section class="benefits-section">
+      <h3>Outcome</h3>
+      <p>Get an actionable contract summary before signing so growth decisions are made with fewer hidden liabilities.</p>
+      <a href="https://decodocs.com/?entry_problem=small_business_owners&utm_source=snapsign.com.au&utm_medium=use_case&utm_campaign=small_business_owners_bottom" class="button">Analyze a contract</a>
+    </section>
+
+    <FeedbackCTA />
+  </div>
+</BaseLayout>

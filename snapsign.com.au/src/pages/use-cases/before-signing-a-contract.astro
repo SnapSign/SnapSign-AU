@@ -1,0 +1,52 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SiteHeader from "../../components/SiteHeader.astro";
+import FeedbackCTA from "../../components/FeedbackCTA.astro";
+
+const title = "Before Signing a Contract | Snap Sign Use Case";
+const description = "Review contract risk before commitment: renewal traps, liability, payment terms, termination penalties, and IP transfer.";
+const canonical = "https://snapsign.com.au/use-cases/before-signing-a-contract/";
+---
+<BaseLayout title={title} description={description} canonical={canonical} ogUrl={canonical}>
+  <div class="container">
+    <SiteHeader />
+
+    <section class="page-hero">
+      <span class="eyebrow">Use case</span>
+      <h1>Before Signing a Contract</h1>
+      <h2>Use this workflow when you need clarity on obligations before you commit.</h2>
+      <a href="https://decodocs.com/?entry_problem=before_signing_contract&utm_source=snapsign.com.au&utm_medium=use_case&utm_campaign=before_signing_contract" class="button">Review a contract now</a>
+    </section>
+
+    <section class="problem-section">
+      <h3>Common contracts</h3>
+      <ul>
+        <li>Service agreements</li>
+        <li>Lease agreements</li>
+        <li>SaaS terms and order forms</li>
+        <li>Partnership agreements</li>
+        <li>Loan and finance contracts</li>
+      </ul>
+    </section>
+
+    <section class="how-section">
+      <h3>High-cost risks to check first</h3>
+      <ul>
+        <li><strong>Auto-renewal traps:</strong> date windows that silently extend commitments.</li>
+        <li><strong>Personal guarantee clauses:</strong> personal exposure for business obligations.</li>
+        <li><strong>Unlimited liability:</strong> no cap on damages or legal costs.</li>
+        <li><strong>Payment terms:</strong> short dispute periods, fees, and aggressive payment triggers.</li>
+        <li><strong>Termination penalties:</strong> expensive early-exit conditions.</li>
+        <li><strong>IP transfer:</strong> broad ownership transfer beyond the intended scope.</li>
+      </ul>
+    </section>
+
+    <section class="benefits-section">
+      <h3>Outcome</h3>
+      <p>You can decide faster with clearer downside visibility before signing.</p>
+      <a href="https://decodocs.com/?entry_problem=before_signing_contract&utm_source=snapsign.com.au&utm_medium=use_case&utm_campaign=before_signing_contract_bottom" class="button">Open your document</a>
+    </section>
+
+    <FeedbackCTA />
+  </div>
+</BaseLayout>

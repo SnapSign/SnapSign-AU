@@ -1,0 +1,79 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SiteHeader from "../../components/SiteHeader.astro";
+import FeedbackCTA from "../../components/FeedbackCTA.astro";
+
+const title = "Use Cases | Understand Business Contracts Before You Sign | Snap Sign";
+const description =
+  "Pain-based use cases for freelancers, small business owners, vendor managers, and investor agreement reviews.";
+const canonical = "https://snapsign.com.au/use-cases/";
+---
+<BaseLayout
+  title={title}
+  description={description}
+  canonical={canonical}
+  ogUrl={canonical}
+  ogSiteName="Snap Sign"
+>
+  <div class="container">
+    <SiteHeader />
+
+    <section class="page-hero">
+      <span class="eyebrow">Pain-based use cases</span>
+      <h1>Understand Business Contracts Before You Sign</h1>
+      <h2>Choose your situation and review the clauses that usually cost money later.</h2>
+      <a href="https://decodocs.com/?utm_source=snapsign.com.au&utm_medium=use_cases_hub&utm_campaign=hero_cta" class="button">Try DecoDocs Free</a>
+    </section>
+
+    <section class="use-cases">
+      <h2>Pick your scenario</h2>
+      <p>The fastest way to recognize risk is seeing the same clause that burned you before.</p>
+
+      <div class="use-case-grid">
+        <a class="use-case-card" href="/use-cases/before-signing-a-contract/">
+          <h3>Before Signing a Contract</h3>
+          <p><strong>Focus:</strong> universal contract risks before commitment.</p>
+          <p><strong>Typical traps:</strong> auto-renewal, unlimited liability, termination penalties.</p>
+        </a>
+
+        <a class="use-case-card" href="/use-cases/freelancers-agencies/">
+          <h3>If you are a freelancer or agency</h3>
+          <p><strong>Focus:</strong> scope, payment, IP ownership, and client control clauses.</p>
+          <p><strong>Typical traps:</strong> IP transfer, late payment terms, one-sided termination.</p>
+        </a>
+
+        <a class="use-case-card" href="/use-cases/small-business-owners/">
+          <h3>If you run a small business</h3>
+          <p><strong>Focus:</strong> commitments that hit cash flow and personal exposure.</p>
+          <p><strong>Typical traps:</strong> personal guarantees, rolling renewals, fee penalties.</p>
+        </a>
+
+        <a class="use-case-card" href="/use-cases/vendor-management/">
+          <h3>If you manage vendors</h3>
+          <p><strong>Focus:</strong> service levels, liability balance, and exit terms.</p>
+          <p><strong>Typical traps:</strong> auto-renewal, weak service credits, hidden lock-ins.</p>
+        </a>
+
+        <a class="use-case-card" href="/use-cases/investor-agreements/">
+          <h3>If you review investor agreements</h3>
+          <p><strong>Focus:</strong> dilution, control rights, and downside protection.</p>
+          <p><strong>Typical traps:</strong> liquidation preferences, broad investor rights, IP transfer side effects.</p>
+        </a>
+      </div>
+    </section>
+
+    <section class="benefits-section">
+      <h3>Universal risk checklist</h3>
+      <ul>
+        <li><strong>Auto-renewal traps:</strong> notice windows and lock-in periods.</li>
+        <li><strong>Personal guarantee clauses:</strong> business debt exposure to founders/directors.</li>
+        <li><strong>Unlimited liability:</strong> uncapped downside for common operational events.</li>
+        <li><strong>Payment terms:</strong> delayed cash flow, harsh dispute windows, and hidden fees.</li>
+        <li><strong>Termination penalties:</strong> large exit costs and restrictive termination conditions.</li>
+        <li><strong>IP transfer:</strong> loss of ownership over work product, templates, or code.</li>
+      </ul>
+    </section>
+
+    <FeedbackCTA />
+  </div>
+</BaseLayout>

@@ -1,0 +1,52 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SiteHeader from "../../components/SiteHeader.astro";
+import FeedbackCTA from "../../components/FeedbackCTA.astro";
+
+const title = "Vendor Management Contracts | Snap Sign Use Case";
+const description = "Review vendor contracts for renewal, liability, payment, termination, and IP risk before procurement sign-off.";
+const canonical = "https://snapsign.com.au/use-cases/vendor-management/";
+---
+<BaseLayout title={title} description={description} canonical={canonical} ogUrl={canonical}>
+  <div class="container">
+    <SiteHeader />
+
+    <section class="page-hero">
+      <span class="eyebrow">Use case</span>
+      <h1>Vendor Management</h1>
+      <h2>Reduce supplier risk and improve contract consistency before approval.</h2>
+      <a href="https://decodocs.com/?entry_problem=vendor_management&utm_source=snapsign.com.au&utm_medium=use_case&utm_campaign=vendor_management" class="button">Review a vendor contract</a>
+    </section>
+
+    <section class="problem-section">
+      <h3>Common contracts</h3>
+      <ul>
+        <li>Master service agreements</li>
+        <li>Order forms and pricing schedules</li>
+        <li>Data processing addenda</li>
+        <li>Security and support schedules</li>
+        <li>Professional services statements of work</li>
+      </ul>
+    </section>
+
+    <section class="how-section">
+      <h3>Procurement-critical risk clauses</h3>
+      <ul>
+        <li><strong>Auto-renewal traps:</strong> difficult notice windows and minimum renewal terms.</li>
+        <li><strong>Personal guarantee clauses:</strong> uncommon but high-impact in smaller supplier contracts.</li>
+        <li><strong>Unlimited liability:</strong> one-sided uncapped indemnities.</li>
+        <li><strong>Payment terms:</strong> prepayment obligations and limited invoice dispute windows.</li>
+        <li><strong>Termination penalties:</strong> lock-in fees and transition-cost exposure.</li>
+        <li><strong>IP transfer:</strong> ownership confusion around deliverables and implementation assets.</li>
+      </ul>
+    </section>
+
+    <section class="benefits-section">
+      <h3>Outcome</h3>
+      <p>Standardize vendor review around the clauses that usually create downstream cost and legal friction.</p>
+      <a href="https://decodocs.com/?entry_problem=vendor_management&utm_source=snapsign.com.au&utm_medium=use_case&utm_campaign=vendor_management_bottom" class="button">Start vendor review</a>
+    </section>
+
+    <FeedbackCTA />
+  </div>
+</BaseLayout>

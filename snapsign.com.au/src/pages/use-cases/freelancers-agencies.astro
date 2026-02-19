@@ -1,0 +1,52 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SiteHeader from "../../components/SiteHeader.astro";
+import FeedbackCTA from "../../components/FeedbackCTA.astro";
+
+const title = "Freelancers & Agencies Contracts | Snap Sign Use Case";
+const description = "Review client contracts for payment, IP, liability, renewal, and termination risk before accepting work.";
+const canonical = "https://snapsign.com.au/use-cases/freelancers-agencies/";
+---
+<BaseLayout title={title} description={description} canonical={canonical} ogUrl={canonical}>
+  <div class="container">
+    <SiteHeader />
+
+    <section class="page-hero">
+      <span class="eyebrow">Use case</span>
+      <h1>Freelancers & Agencies</h1>
+      <h2>Protect margins and ownership before accepting client terms.</h2>
+      <a href="https://decodocs.com/?entry_problem=freelancers_agencies&utm_source=snapsign.com.au&utm_medium=use_case&utm_campaign=freelancers_agencies" class="button">Check a client contract</a>
+    </section>
+
+    <section class="problem-section">
+      <h3>Common contracts</h3>
+      <ul>
+        <li>Master service agreements</li>
+        <li>Statements of work</li>
+        <li>Retainer agreements</li>
+        <li>Creative production contracts</li>
+        <li>Independent contractor terms</li>
+      </ul>
+    </section>
+
+    <section class="how-section">
+      <h3>Clause risks that usually hit freelancers first</h3>
+      <ul>
+        <li><strong>Auto-renewal traps:</strong> lock-ins that keep low-rate retainers running.</li>
+        <li><strong>Personal guarantee clauses:</strong> direct personal liability for project disputes.</li>
+        <li><strong>Unlimited liability:</strong> risk disproportionate to contract value.</li>
+        <li><strong>Payment terms:</strong> long payment cycles, one-sided acceptance criteria, chargebacks.</li>
+        <li><strong>Termination penalties:</strong> termination for convenience with no fair wind-down fees.</li>
+        <li><strong>IP transfer:</strong> overbroad assignment of reusable methods, templates, and code.</li>
+      </ul>
+    </section>
+
+    <section class="benefits-section">
+      <h3>Outcome</h3>
+      <p>Negotiate from a clear risk map instead of discovering issues after delivery starts.</p>
+      <a href="https://decodocs.com/?entry_problem=freelancers_agencies&utm_source=snapsign.com.au&utm_medium=use_case&utm_campaign=freelancers_agencies_bottom" class="button">Review your agreement</a>
+    </section>
+
+    <FeedbackCTA />
+  </div>
+</BaseLayout>

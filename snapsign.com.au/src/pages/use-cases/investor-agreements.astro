@@ -1,0 +1,52 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import SiteHeader from "../../components/SiteHeader.astro";
+import FeedbackCTA from "../../components/FeedbackCTA.astro";
+
+const title = "Investor Agreements | Snap Sign Use Case";
+const description = "Decode investor terms before signing: liability, dilution impact, payment obligations, termination mechanics, and IP side effects.";
+const canonical = "https://snapsign.com.au/use-cases/investor-agreements/";
+---
+<BaseLayout title={title} description={description} canonical={canonical} ogUrl={canonical}>
+  <div class="container">
+    <SiteHeader />
+
+    <section class="page-hero">
+      <span class="eyebrow">Use case</span>
+      <h1>Investor Agreements</h1>
+      <h2>Decode investor terms before they dilute ownership or limit control.</h2>
+      <a href="https://decodocs.com/?entry_problem=investor_agreements&utm_source=snapsign.com.au&utm_medium=use_case&utm_campaign=investor_agreements" class="button">Review investor terms</a>
+    </section>
+
+    <section class="problem-section">
+      <h3>Common documents</h3>
+      <ul>
+        <li>Term sheets</li>
+        <li>SAFE notes</li>
+        <li>Convertible note agreements</li>
+        <li>Shareholders agreements</li>
+        <li>Subscription agreements</li>
+      </ul>
+    </section>
+
+    <section class="how-section">
+      <h3>High-impact clause checks for founders</h3>
+      <ul>
+        <li><strong>Auto-renewal traps:</strong> rolling advisory, board observer, or service obligations tied to funding docs.</li>
+        <li><strong>Personal guarantee clauses:</strong> founder-level obligations hidden in side letters or financing terms.</li>
+        <li><strong>Unlimited liability:</strong> uncapped representations, warranties, or indemnity exposure.</li>
+        <li><strong>Payment terms:</strong> obligations tied to milestones, defaults, or enforcement costs.</li>
+        <li><strong>Termination penalties:</strong> cost and control impacts of early exits or default events.</li>
+        <li><strong>IP transfer:</strong> assignment language that can affect founder or company IP ownership boundaries.</li>
+      </ul>
+    </section>
+
+    <section class="benefits-section">
+      <h3>Outcome</h3>
+      <p>See where economics and control shift before you sign, then bring focused questions to counsel and investors.</p>
+      <a href="https://decodocs.com/?entry_problem=investor_agreements&utm_source=snapsign.com.au&utm_medium=use_case&utm_campaign=investor_agreements_bottom" class="button">Analyze investor docs</a>
+    </section>
+
+    <FeedbackCTA />
+  </div>
+</BaseLayout>

@@ -694,7 +694,9 @@ ul, ol {
 }
 
 .use-case-card {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   border-radius: var(--radius-lg);
   border: 1px solid rgba(10,36,99,0.06);
   padding: var(--space-6);
@@ -702,6 +704,7 @@ ul, ol {
   color: inherit;
   background: var(--white);
   text-align: left;
+  gap: var(--space-2);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
@@ -711,8 +714,9 @@ ul, ol {
   margin-bottom: var(--space-3);
 }
 
-.use-case-card h3 { margin: 0 0 var(--space-2); font-size: var(--text-lg); line-height: 24px; text-align: left; }
-.use-case-card p   { margin: 0; text-align: left; }
+.use-case-card h3 { margin: 0 0 var(--space-1); font-size: var(--text-lg); line-height: 24px; text-align: left; }
+.use-case-card p  { margin: 0; text-align: left; }
+.use-case-card strong { color: var(--deep-royal); }
 
 .use-case-card:hover {
   transform: translateY(-3px);

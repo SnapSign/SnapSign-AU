@@ -36,10 +36,10 @@ DecoDocs backend AI functions are implemented. Remaining work is **integration a
 
 ## PARTIALLY STUBBED (Fix Implementation)
 
-- [ ] **`analyzeByType` (Line 1145 in functions/index.js)**
-  - 🟡 Gemini call exists but output/message still marked placeholder in places
-  - 🎯 **Action:** finalize contract/output messaging and test behavior
-  - 📝 **Time:** ~4 hours
+- [x] **`analyzeByType` (Line 1145 in functions/index.js)**
+  - ✅ Gemini call implemented (LLM extraction + validation wired); unit tests present
+  - 🎯 **Action:** expand test coverage, finalize frontend/backend contract alignment
+  - 📝 **Time:** ~4 hours (testing & docs)
   - 📍 **Location:** `functions/index.js:1145-1250`
 
 ---

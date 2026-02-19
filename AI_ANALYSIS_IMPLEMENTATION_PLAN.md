@@ -40,7 +40,7 @@ The DecoDocs web app has **implemented backend AI callables**, but integration a
    - ✅ `explainSelection` - Gemini-backed callable implemented
    - ✅ `highlightRisks` - Gemini-backed callable implemented
    - ✅ `translateToPlainEnglish` - Gemini-backed callable implemented
-   - 🟡 `analyzeByType` - Gemini call exists; still labeled placeholder and needs final hardening
+   - ✅ `analyzeByType` - Gemini extraction wired; needs tests and final hardening
 
 2. **Frontend Features**
    - 🔴 Selection-based explanation contract mismatch (`success` expected vs backend `ok`)

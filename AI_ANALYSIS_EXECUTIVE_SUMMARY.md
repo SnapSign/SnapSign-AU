@@ -12,7 +12,7 @@ DecoDocs has **partially integrated AI analysis features**:
 - ✅ Frontend UI built and ready
 - ✅ Backend callable functions implemented (`analyzeText`, `explainSelection`, `highlightRisks`, `translateToPlainEnglish`, `analyzeByType`)
 - ⚠️ Frontend/backend response contract mismatch in some handlers (`ok` vs `success`)
-- ⚠️ `analyzeByType` still marked placeholder in backend message and docs
+- ✅ `analyzeByType` implemented (Gemini LLM extraction wired); docs/tests need alignment
 - 🔴 Some UI tools still incomplete (summaries/improvements wiring, test coverage)
 
 **Result:** Core AI calls exist, but some features still fail or behave inconsistently because integration and documentation are out of sync.
@@ -29,7 +29,7 @@ DecoDocs has **partially integrated AI analysis features**:
 | `explainSelection` | ✅ Implemented with Gemini | HIGH | 2h (response contract alignment) |
 | `highlightRisks` | ✅ Implemented with Gemini | HIGH | 2h (response contract alignment) |
 | `translateToPlainEnglish` | ✅ Implemented with Gemini | HIGH | 2h (response contract alignment) |
-| `analyzeByType` | 🟡 Gemini integrated, still labeled placeholder | HIGH | 4h |
+| `analyzeByType` | ✅ Gemini integrated — extraction wired; needs tests/hardening | HIGH | 4h |
 
 **Total Remaining Effort:** ~16-24 hours (contract alignment + frontend polish + tests + docs)
 
@@ -45,7 +45,7 @@ Integrate **Google Gemini API** with proper error handling, token budgets, and c
 Stabilize existing Gemini-backed functions:
 1. Align response contracts (`ok`/`success`) across frontend and backend
 2. Normalize risk fields (`severity` vs `riskLevel`)
-3. Remove placeholder messaging in `analyzeByType` after final logic pass
+3. Finalize tests and remove leftover "placeholder" references for `analyzeByType`; perform contract alignment
 4. Expand backend tests for all analysis callables
 5. Update AI docs to reflect implemented state
 

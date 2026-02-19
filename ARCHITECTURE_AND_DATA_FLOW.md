@@ -75,7 +75,7 @@
 │  │  └────────────────────────────────────────────────────────────────┘ │   │
 │  │                                                                         │   │
 │  │  ┌────────────────────────────────────────────────────────────────┐ │   │
-│  │  │ analyzeByType ✅ (PARTIAL - STUBBED)                         │ │   │
+│  │  │ analyzeByType ✅ (Gemini-backed; testing/hardening remaining) │ │   │
 │  │  │  ├─ Input: { docHash, text }                                │ │   │
 │  │  │  ├─ Process: Type-specific analysis with Gemini            │ │   │
 │  │  │  ├─ Output: Validation against type schema                 │ │   │

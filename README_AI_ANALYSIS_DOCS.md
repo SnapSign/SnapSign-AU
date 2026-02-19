@@ -182,7 +182,7 @@ cat AI_ANALYSIS_QUICK_CHECKLIST.md
 | **explainSelection** | Missing ❌ | Working ✅ |
 | **highlightRisks** | Missing ❌ | Working ✅ |
 | **translateToPlainEnglish** | Missing ❌ | Working ✅ |
-| **analyzeByType** | Stubbed 🟡 | Complete ✅ |
+| **analyzeByType** | Implemented ✅ (tests/hardening pending) | Complete ✅ |
 | **Risk highlighting UI** | Not rendering ❌ | Rendering ✅ |
 | **UI buttons** | 4 non-functional ❌ | All working ✅ |
 | **Tests** | Missing ❌ | >80% coverage ✅ |
@@ -206,7 +206,7 @@ cat AI_ANALYSIS_QUICK_CHECKLIST.md
 
 - **Functions Missing:** 3 (explainSelection, highlightRisks, translateToPlainEnglish)
 - **Functions Using Mock:** 1 (analyzeText)
-- **Functions Incomplete:** 1 (analyzeByType)
+- **Functions Incomplete:** 0 (follow-up: hardening/tests for `analyzeByType`)
 - **Total Effort:** ~32 hours
 - **Timeline:** 1 week (full-time) or 2 weeks (part-time)
 - **Team Size Needed:** 2-3 engineers

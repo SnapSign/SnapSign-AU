@@ -1,0 +1,42 @@
+name: Playwright E2E (preview)
+
+on:
+  pull_request:
+    paths:
+      - 'Decodocs/web/**'
+      - '.github/workflows/**'
+  push:
+    branches:
+      - main
+
+jobs:
+  e2e-preview:
+    name: Playwright E2E (built preview)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install web dependencies
+        run: npm ci
+        working-directory: Decodocs/web
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+        working-directory: Decodocs/web
+
+      - name: Run Playwright E2E against preview build
+        working-directory: Decodocs/web
+        env:
+          E2E_USE_PREVIEW: '1'
+          CI: 'true'
+        run: |
+          # Playwright's webServer will run `npm run build && npm run preview`
+          npm run test:e2e -- --reporter=github

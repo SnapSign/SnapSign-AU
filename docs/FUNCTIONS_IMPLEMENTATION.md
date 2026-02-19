@@ -124,5 +124,5 @@ Current response:
 - `TTL_DAYS_USAGE_DOCS = 30` (cleanup targets `usage_daily`)
 
 ## Notes
-- Analysis content is still mock/placeholder in current `analyzeText` implementation.
+- Analysis content is Gemini-backed and returns structured JSON; finalize contract alignment and tests.
 - This doc intentionally supersedes old per-document `aiCallsUsed` documentation.

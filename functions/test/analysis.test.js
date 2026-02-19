@@ -232,7 +232,7 @@ describe('AI Analysis Functions', () => {
             const req = {
                 data: {
                     docHash: 'a'.repeat(64),
-                    text: { value: 'Document content' }, // IMPORTANT: analyzeByType expects text.value
+                    text: { value: 'Document content' }, // IMPORTANT: analyzeByType accepts text.value
                     stats: { totalChars: 100 }
                 },
                 auth: { uid: 'test-uid' }
@@ -244,15 +244,21 @@ describe('AI Analysis Functions', () => {
             expect(result.ok).to.be.true;
             expect(result.result.plainExplanation).to.equal("Type analysis");
 
-            // Verify that the prompt included MDX content. 
+            // extracted should be converted from array -> object
+            expect(result.result.extracted).to.be.an('object');
+            expect(result.result.extracted.date).to.equal('2023-01-01');
+
+            // basic stats and usage should be present
+            expect(result.stats).to.have.property('textChars').that.is.a('number').and.is.greaterThan(0);
+            expect(result.usage).to.have.property('estimatedTokens').that.is.a('number');
+
+            // Verify that the prompt included MDX content.
             const callArgs = modelStub.generateContent.firstCall.args[0];
 
             let promptText = '';
             if (typeof callArgs === 'string') {
                 promptText = callArgs;
             } else if (callArgs.contents && callArgs.contents[0] && callArgs.contents[0].parts) {
-                // If parts is array of objects { text: ... } or just strings?
-                // google-generative-ai parts usually { text: string }
                 const part = callArgs.contents[0].parts[0];
                 promptText = typeof part === 'string' ? part : part.text;
             } else {
@@ -261,6 +267,28 @@ describe('AI Analysis Functions', () => {
 
             expect(promptText).to.contain('Risk Analysis');
             expect(promptText).to.contain('Validation Checks');
+        });
+
+        it('should return fallback result when Gemini errors', async () => {
+            modelStub.generateContent.rejects(new Error('Gemini failure'));
+
+            const req = {
+                data: {
+                    docHash: 'b'.repeat(64),
+                    text: { value: 'Some other content' },
+                    stats: { totalChars: 50 }
+                },
+                auth: { uid: 'test-uid' }
+            };
+
+            const wrapped = test.wrap(myFunctions.analyzeByType);
+            const result = await wrapped(req);
+
+            expect(result.ok).to.be.true;
+            expect(result.result).to.be.an('object');
+            expect(result.result.plainExplanation).to.match(/Analysis failed:/);
+            expect(result.result.extracted).to.deep.equal({});
+            expect(result.result.checks).to.deep.equal([]);
         });
     });
 });

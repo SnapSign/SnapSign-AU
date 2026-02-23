@@ -67,7 +67,7 @@ run_npm_install() {
 run_npm_build() {
   local dir="$1"
   log "Building $dir"
-  (cd "$dir" && npm run build)
+  (cd "$dir" && npm run build --if-present)
 }
 
 while [[ $# -gt 0 ]]; do

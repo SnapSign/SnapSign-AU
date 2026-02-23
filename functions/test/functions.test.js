@@ -118,6 +118,8 @@ describe('DecoDocs Functions Unit Tests', () => {
       'firebase-admin': adminStub,
       './lib/gemini-client': {
         getGeminiModel: getGeminiModelStub,
+        getResolvedGeminiModelName: () => 'gemini-2.5-flash',
+        MODEL_NAME: 'gemini-2.5-flash',
       },
       './lib/prompts': {
         buildAnalysisPrompt: () => 'analysis prompt',
@@ -131,6 +133,8 @@ describe('DecoDocs Functions Unit Tests', () => {
 
   beforeEach(() => {
     firestoreStub.__clear();
+    // Seed admin/gemini to reflect the production document structure (flat key, no mode/model).
+    firestoreStub.__seed('admin/gemini', { key: 'test-api-key' });
   });
 
   after(() => {
@@ -413,13 +417,57 @@ describe('DecoDocs Functions Unit Tests', () => {
       });
 
       expect(result.ok).to.equal(true);
+      expect(result.kind).to.equal('bug');
+      expect(result.docType).to.equal('report_bug');
+
+      const intakeWrites = firestoreStub.__added('user_reports');
+      expect(intakeWrites).to.have.length.greaterThan(0);
+      const intakeLast = intakeWrites[intakeWrites.length - 1];
+      expect(intakeLast.kind).to.equal('bug');
+      expect(intakeLast.docType).to.equal('report_bug');
+      expect(intakeLast.reportType).to.equal('user_bug');
+      expect(intakeLast.ratingStars).to.equal(null);
+
       const writes = firestoreStub.__added('admin_reports');
       expect(writes).to.have.length.greaterThan(0);
       const last = writes[writes.length - 1];
       expect(last.reportType).to.equal('user_bug');
+      expect(last.docType).to.equal('report_bug');
       expect(last.source).to.equal('web');
       expect(last.status).to.equal('open');
       expect(last.uid).to.equal(null);
+    });
+
+    it('accepts feedback with rating stars and writes doc type flag', async () => {
+      const wrapped = test.wrap(myFunctions.submitUserReport);
+      const result = await wrapped({
+        data: {
+          kind: 'feedback',
+          ratingStars: 5,
+          message: 'Great experience overall, upload + analysis flow is clear.',
+          pageUrl: 'https://decodocs.com/view',
+          userAgent: 'Mozilla/5.0 test',
+        },
+      });
+
+      expect(result.ok).to.equal(true);
+      expect(result.kind).to.equal('feedback');
+      expect(result.docType).to.equal('report_feedback');
+
+      const intakeWrites = firestoreStub.__added('user_reports');
+      expect(intakeWrites).to.have.length.greaterThan(0);
+      const intakeLast = intakeWrites[intakeWrites.length - 1];
+      expect(intakeLast.kind).to.equal('feedback');
+      expect(intakeLast.docType).to.equal('report_feedback');
+      expect(intakeLast.reportType).to.equal('user_feedback');
+      expect(intakeLast.ratingStars).to.equal(5);
+
+      const writes = firestoreStub.__added('admin_reports');
+      expect(writes).to.have.length.greaterThan(0);
+      const last = writes[writes.length - 1];
+      expect(last.reportType).to.equal('user_feedback');
+      expect(last.docType).to.equal('report_feedback');
+      expect(last.ratingStars).to.equal(5);
     });
 
     it('rejects invalid kind values', async () => {
@@ -427,6 +475,21 @@ describe('DecoDocs Functions Unit Tests', () => {
       try {
         await wrapped({
           data: { kind: 'other', message: 'Some message that should fail' },
+        });
+        expect.fail('Expected invalid-argument');
+      } catch (e) {
+        expect(e.code).to.equal('invalid-argument');
+      }
+    });
+
+    it('rejects feedback without a valid star rating', async () => {
+      const wrapped = test.wrap(myFunctions.submitUserReport);
+      try {
+        await wrapped({
+          data: {
+            kind: 'feedback',
+            message: 'Pretty good product overall but missing dashboard widgets.',
+          },
         });
         expect.fail('Expected invalid-argument');
       } catch (e) {

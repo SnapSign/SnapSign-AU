@@ -51,21 +51,20 @@ Local app dev (typical):
 npm --prefix Decodocs/web run dev
 npm --prefix Decodocs/admin run dev
 npm --prefix snapsign.com.au run dev
-firebase emulators:start
 ```
 
 ## Build And Deploy
 
-Primary workflow:
+Primary workflow (canonical):
 ```bash
-./build-and-deploy.sh
+./test-build-deploy.sh
 ```
 
 Common alternatives:
 ```bash
-./build-and-deploy.sh --skip-deploy
-./build-and-deploy.sh --skip-install --skip-build
-./build-and-deploy.sh --only hosting
+./test-build-deploy.sh --skip-deploy
+./test-build-deploy.sh --skip-install --skip-build
+./test-build-deploy.sh --only hosting
 ```
 
 Manual fallback:
@@ -92,3 +91,8 @@ This repository intentionally uses simple static hosting + basic functions:
   - standard process environment provided by the execution platform (CI, Firebase runtime, shell), without local env files.
 
 See `AGENTS.md` for enforcement details and policy rationale.
+
+## Emulator Policy (No Firebase Emulators)
+
+- Firebase emulators are not used in this repo (not for tests, not for dev).
+- Tests must target deployed Firebase (production Functions) via client-side test code that is as close as possible to the real production frontend behavior.

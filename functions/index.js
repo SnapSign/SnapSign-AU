@@ -15,6 +15,7 @@ const geminiClient = require('./lib/gemini-client');
 const { getGeminiModel } = geminiClient;
 const { buildAnalysisPrompt, buildExplanationPrompt, buildRiskPrompt, buildTranslationPrompt, buildTypeSpecificPrompt } = require('./lib/prompts');
 const { analysisSchema, explanationSchema, riskAssessmentSchema, translationSchema, typeSpecificSchema } = require('./lib/analysis-schema');
+const { generateGeminiJson } = require('./lib/gemini-json');
 
 // In production on Firebase, Admin SDK uses application default credentials automatically.
 // For local development (emulators), we optionally bootstrap with a service account JSON file.
@@ -74,6 +75,7 @@ const CONFIG = {
 };
 
 const ADMIN_AI_EVENTS_COLLECTION = 'admin_ai_events';
+const USER_REPORTS_COLLECTION = 'user_reports';
 const DEFAULT_GEMINI_MODEL_NAME = 'gemini-2.5-flash';
 
 // Function to validate auth context
@@ -338,7 +340,7 @@ const enforceAndRecordTokenUsage = async ({ puid, tier, estimatedTokens }) => {
         dayKey,
         tokensUsed: admin.firestore.FieldValue.increment(estimatedTokens),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        createdAt: doc.exists ? doc.data()?.createdAt : admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: doc.data()?.createdAt ?? admin.firestore.FieldValue.serverTimestamp(),
       },
       { merge: true }
     );
@@ -444,6 +446,13 @@ const normalizeReportKind = (kind) => {
   const normalized = String(kind || '').trim().toLowerCase();
   if (normalized === 'bug' || normalized === 'feedback') return normalized;
   return null;
+};
+
+const normalizeFeedbackRating = (rawRating) => {
+  if (rawRating === null || rawRating === undefined || rawRating === '') return null;
+  const numeric = Number(rawRating);
+  if (!Number.isInteger(numeric) || numeric < 1 || numeric > 5) return null;
+  return numeric;
 };
 
 // Preflight check function
@@ -583,17 +592,12 @@ exports.analyzeText = functions.https.onCall(async ({ data, ...context }) => {
     const model = await getGeminiModel();
     const prompt = buildAnalysisPrompt(strippedText, { documentType: options.documentType });
 
-    // Call Gemini with structured output
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseSchema: analysisSchema,
-        responseMimeType: 'application/json',
-        temperature: 0.2, // Low temperature for factual analysis
-      }
+    const { data: analysisData } = await generateGeminiJson({
+      model,
+      prompt,
+      schema: analysisSchema,
+      temperature: 0.2,
     });
-
-    const analysisData = JSON.parse(result.response.text());
     const validatedAnalysis = validateOutputSchema(analysisData);
 
     // Record docHash ledger
@@ -641,6 +645,7 @@ exports.analyzeText = functions.https.onCall(async ({ data, ...context }) => {
       input: { docHash: data?.docHash, stats: data?.stats, options: data?.options },
     });
     if (error instanceof functions.https.HttpsError) throw error;
+    if (error.status === 429) throw new functions.https.HttpsError('resource-exhausted', 'AI service rate limit reached. Please try again in a moment.');
     throw new functions.https.HttpsError('internal', 'An error occurred during text analysis.');
   }
 });
@@ -670,15 +675,12 @@ exports.explainSelection = functions.https.onCall(async ({ data, ...context }) =
     const model = await getGeminiModel();
     const prompt = buildExplanationPrompt(selection, documentContext);
 
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseSchema: explanationSchema,
-        responseMimeType: 'application/json'
-      }
+    const { data: explanation } = await generateGeminiJson({
+      model,
+      prompt,
+      schema: explanationSchema,
+      temperature: 0.2,
     });
-
-    const explanation = JSON.parse(result.response.text());
 
     return {
       ok: true,
@@ -694,6 +696,8 @@ exports.explainSelection = functions.https.onCall(async ({ data, ...context }) =
       context,
       input: { docHash: data?.docHash, hasDocumentContext: !!data?.documentContext },
     });
+    if (error instanceof functions.https.HttpsError) throw error;
+    if (error.status === 429) throw new functions.https.HttpsError('resource-exhausted', 'AI service rate limit reached. Please try again in a moment.');
     throw new functions.https.HttpsError('internal', 'Failed to explain selection');
   }
 });
@@ -720,15 +724,12 @@ exports.highlightRisks = functions.https.onCall(async ({ data, ...context }) => 
     const model = await getGeminiModel();
     const prompt = buildRiskPrompt(documentText, documentType);
 
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseSchema: riskAssessmentSchema,
-        responseMimeType: 'application/json'
-      }
+    const { data: risks } = await generateGeminiJson({
+      model,
+      prompt,
+      schema: riskAssessmentSchema,
+      temperature: 0.2,
     });
-
-    const risks = JSON.parse(result.response.text());
 
     return {
       ok: true,
@@ -744,6 +745,8 @@ exports.highlightRisks = functions.https.onCall(async ({ data, ...context }) => 
       context,
       input: { docHash: data?.docHash, documentType: data?.documentType },
     });
+    if (error instanceof functions.https.HttpsError) throw error;
+    if (error.status === 429) throw new functions.https.HttpsError('resource-exhausted', 'AI service rate limit reached. Please try again in a moment.');
     throw new functions.https.HttpsError('internal', 'Failed to analyze risks');
   }
 });
@@ -770,15 +773,12 @@ exports.translateToPlainEnglish = functions.https.onCall(async ({ data, ...conte
     const model = await getGeminiModel();
     const prompt = buildTranslationPrompt(legalText);
 
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseSchema: translationSchema,
-        responseMimeType: 'application/json'
-      }
+    const { data: translation } = await generateGeminiJson({
+      model,
+      prompt,
+      schema: translationSchema,
+      temperature: 0.2,
     });
-
-    const translation = JSON.parse(result.response.text());
 
     return {
       ok: true,
@@ -794,6 +794,8 @@ exports.translateToPlainEnglish = functions.https.onCall(async ({ data, ...conte
       context,
       input: { docHash: data?.docHash },
     });
+    if (error instanceof functions.https.HttpsError) throw error;
+    if (error.status === 429) throw new functions.https.HttpsError('resource-exhausted', 'AI service rate limit reached. Please try again in a moment.');
     throw new functions.https.HttpsError('internal', 'Failed to translate text');
   }
 });
@@ -856,14 +858,29 @@ exports.submitUserReport = functions.https.onCall(async ({ data, ...context }) =
     const pageUrl = safeString(data?.pageUrl, '');
     const userAgent = safeString(data?.userAgent, '');
     const extra = sanitizeReportValue(data?.extra || null);
+    const ratingStars = normalizeFeedbackRating(data?.ratingStars);
+    if (kind === 'feedback' && ratingStars === null) {
+      throw new functions.https.HttpsError('invalid-argument', 'feedback requires ratingStars between 1 and 5');
+    }
+    if (kind === 'bug' && data?.ratingStars !== undefined && ratingStars === null) {
+      throw new functions.https.HttpsError('invalid-argument', 'ratingStars must be an integer between 1 and 5 when provided');
+    }
     const token = context?.auth?.token || {};
 
     const reportType = kind === 'bug' ? 'user_bug' : 'user_feedback';
-    await logAdminReport({
-      reportType,
+    const docType = kind === 'bug' ? 'report_bug' : 'report_feedback';
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
+    const reportRef = await db.collection(USER_REPORTS_COLLECTION).add({
+      createdAt: now,
+      updatedAt: now,
+      status: 'open',
       source: 'web',
+      kind,
+      docType,
+      reportType,
       severity: kind === 'bug' ? 'warning' : 'info',
-      functionName: 'submitUserReport',
+      ratingStars: kind === 'feedback' ? ratingStars : null,
       message,
       pageUrl: pageUrl || null,
       userAgent: userAgent || null,
@@ -873,7 +890,24 @@ exports.submitUserReport = functions.https.onCall(async ({ data, ...context }) =
       input: extra,
     });
 
-    return { ok: true };
+    await logAdminReport({
+      reportType,
+      source: 'web',
+      severity: kind === 'bug' ? 'warning' : 'info',
+      functionName: 'submitUserReport',
+      message,
+      kind,
+      docType,
+      ratingStars: kind === 'feedback' ? ratingStars : null,
+      pageUrl: pageUrl || null,
+      userAgent: userAgent || null,
+      uid: context?.auth?.uid || null,
+      email: token?.email || null,
+      authProvider: token?.firebase?.sign_in_provider || null,
+      input: extra,
+    });
+
+    return { ok: true, reportId: reportRef.id, kind, docType };
   } catch (error) {
     await logBackendException({
       functionName: 'submitUserReport',
@@ -1577,7 +1611,12 @@ exports.detectDocumentType = functions.https.onCall(async ({ data, ...context })
     const charsPerPage = Array.isArray(stats?.charsPerPage) ? stats.charsPerPage : [];
     const totalChars = stats?.totalChars || 0;
 
-    const rawText = String(data?.text || '');
+    let rawText = '';
+    if (typeof data?.text === 'string') {
+      rawText = data.text;
+    } else if (data?.text && typeof data.text.value === 'string') {
+      rawText = data.text.value;
+    }
     const text = rawText.slice(0, 250000); // hard cap
     const lower = text.toLowerCase();
 
@@ -1662,7 +1701,13 @@ exports.analyzeByType = functions.https.onCall(async ({ data, ...context }) => {
   const docHash = data?.docHash;
   validateDocHash(docHash);
 
-  const text = String(data?.text || '').slice(0, 250000);
+  let rawText = '';
+  if (typeof data?.text === 'string') {
+    rawText = data.text;
+  } else if (data?.text && typeof data.text.value === 'string') {
+    rawText = data.text.value;
+  }
+  const text = rawText.slice(0, 250000);
 
   const estimatedTokens = estimateTokensFromChars(text.length);
 
@@ -1725,17 +1770,12 @@ exports.analyzeByType = functions.https.onCall(async ({ data, ...context }) => {
     const model = await getGeminiModel();
     geminiModelName = getActiveGeminiModelName();
     const prompt = buildTypeSpecificPrompt(safeText, effectiveTypeId || 'document', validationSpec);
-
-    const geminiResult = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseSchema: typeSpecificSchema,
-        responseMimeType: 'application/json',
-        temperature: 0.1, // low temperature for structured extraction
-      }
+    const { data: rawData } = await generateGeminiJson({
+      model,
+      prompt,
+      schema: typeSpecificSchema,
+      temperature: 0.1,
     });
-
-    const rawData = JSON.parse(geminiResult.response.text());
 
     // Transform extracted array back to object for frontend
     const extractedObj = {};
@@ -1743,6 +1783,11 @@ exports.analyzeByType = functions.https.onCall(async ({ data, ...context }) => {
       rawData.extracted.forEach(item => {
         if (item.key) extractedObj[item.key] = item.value;
       });
+    } else if (rawData.extracted && typeof rawData.extracted === 'object') {
+      // Allow fallback attempts to return extracted as an object already.
+      for (const [k, v] of Object.entries(rawData.extracted)) {
+        if (typeof k === 'string' && k.trim()) extractedObj[k] = typeof v === 'string' ? v : JSON.stringify(v);
+      }
     }
 
     result = {
@@ -1835,6 +1880,7 @@ exports.analyzeByType = functions.https.onCall(async ({ data, ...context }) => {
       input: { docHash: data?.docHash || null },
     });
     if (error instanceof functions.https.HttpsError) throw error;
+    if (error.status === 429) throw new functions.https.HttpsError('resource-exhausted', 'AI service rate limit reached. Please try again in a moment.');
     throw new functions.https.HttpsError('internal', 'Failed to analyze by type');
   }
 });
@@ -2092,5 +2138,80 @@ exports.setDocByPath = functions.https.onRequest(async (req, res) => {
       });
     }
     return res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// ─── Admin: User Management ──────────────────────────────────────────────────
+
+/**
+ * adminListUsers — list Firebase Auth users (admin only, up to 1000 at a time).
+ * data: { pageToken?: string }
+ */
+exports.adminListUsers = functions.https.onCall(async ({ data, ...context }) => {
+  validateAdminContext(context);
+  const pageToken = typeof data?.pageToken === 'string' ? data.pageToken : undefined;
+  try {
+    const result = await admin.auth().listUsers(1000, pageToken);
+    return {
+      users: result.users.map((u) => ({
+        uid: u.uid,
+        email: u.email || null,
+        displayName: u.displayName || null,
+        disabled: u.disabled,
+        emailVerified: u.emailVerified,
+        createdAt: u.metadata.creationTime || null,
+        lastSignInAt: u.metadata.lastSignInTime || null,
+        customClaims: u.customClaims || null,
+        providerIds: (u.providerData || []).map((p) => p.providerId),
+      })),
+      nextPageToken: result.pageToken || null,
+    };
+  } catch (e) {
+    await logBackendException({ functionName: 'adminListUsers', error: e, input: {} });
+    throw new functions.https.HttpsError('internal', e?.message || 'Failed to list users');
+  }
+});
+
+/**
+ * adminUpdateUser — disable/enable a user or update displayName (admin only).
+ * data: { uid: string, disabled?: boolean, displayName?: string }
+ */
+exports.adminUpdateUser = functions.https.onCall(async ({ data, ...context }) => {
+  validateAdminContext(context);
+  const { uid, disabled, displayName } = data || {};
+  if (!uid || typeof uid !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'uid is required');
+  }
+  const update = {};
+  if (typeof disabled === 'boolean') update.disabled = disabled;
+  if (typeof displayName === 'string') update.displayName = displayName;
+  if (Object.keys(update).length === 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'No fields to update');
+  }
+  try {
+    await admin.auth().updateUser(uid, update);
+    return { ok: true };
+  } catch (e) {
+    await logBackendException({ functionName: 'adminUpdateUser', error: e, input: { uid } });
+    throw new functions.https.HttpsError('internal', e?.message || 'Failed to update user');
+  }
+});
+
+/**
+ * adminDeleteUser — permanently delete a Firebase Auth user (admin only).
+ * data: { uid: string }
+ */
+exports.adminDeleteUser = functions.https.onCall(async ({ data, ...context }) => {
+  validateAdminContext(context);
+  const { uid } = data || {};
+  if (!uid || typeof uid !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'uid is required');
+  }
+  try {
+    await admin.auth().deleteUser(uid);
+    return { ok: true };
+  } catch (e) {
+    await logBackendException({ functionName: 'adminDeleteUser', error: e, input: { uid } });
+    throw new functions.https.HttpsError('internal', e?.message || 'Failed to delete user');
   }
 });

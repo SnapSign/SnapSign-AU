@@ -199,8 +199,6 @@ ul, ol {
    ============================================================ */
 
 .site-header {
-  position: sticky;
-  top: 0;
   z-index: 30;
   width: 100%;
   border-bottom: 1px solid rgba(255,255,255,0.5);

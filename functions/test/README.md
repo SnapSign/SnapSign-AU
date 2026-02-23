@@ -5,7 +5,9 @@ This directory contains unit and integration tests for the Firebase Functions.
 ## Running Tests
 
 ### Prerequisites
-For emulator-based tests, make sure you have the Firebase CLI installed and emulators running:
+Firebase emulators are not used in this repo. Tests should run against deployed Firebase where applicable.
+
+Make sure you have the Firebase CLI installed:
 
 ```bash
 npm install -g firebase-tools
@@ -76,13 +78,37 @@ The value should be the Cloud Run base URL for your deployed functions service (
 ### MinIO Integration Tests
 Run the MinIO-focused suite:
 
+## Analysis Pipeline Integration Tests
+
+Calls the **real deployed functions** with real Firebase anonymous and free-tier auth tokens.
+No mocks, no emulators. Covers the full text-analysis pipeline including quota enforcement.
+
 ```bash
-npm run test:minio
+# Prerequisite (for quota seeding via Firestore admin):
+gcloud auth application-default login
+
+npm run test:analysis
 ```
 
-Config load order:
-1. Firestore `admin/minio` (ADC required): `gcloud auth application-default login`
-2. Local fallback: `test/.minio-test-config.json`
+What it tests:
+- `preflightCheck` — readable / scanned / oversized docs (anon + free)
+- `getEntitlement` — tier, feature flags, budget values; unauthenticated rejection
+- `detectDocumentType` — invoice, job offer, privacy policy, SOP (heuristic, no AI cost)
+- `analyzeText` — end-to-end Gemini call with structured response validation
+- `explainSelection` — end-to-end Gemini call for legal clause explanation
+- `analyzeByType` — detect → analyze pipeline with extracted fields
+- **Quota: anonymous tier** — pre-seeds `users/{uid}.usage.anonTokensUsed` near the 20 000 limit; verifies allow then block behaviour (blocked calls never reach Gemini)
+- **Quota: free tier** — pre-seeds `usage_daily/{uid}_{dayKey}.tokensUsed` near the 40 000 daily limit; verifies allow then block for both `analyzeText` and `explainSelection`
+
+The quota and non-AI tests (preflightCheck, detectDocumentType) burn **zero** Gemini tokens.
+The AI path tests use small fixtures (< 500 chars, ~50–100 tokens each).
+
+Override the Cloud Run URL suffix via env:
+```bash
+FUNCTIONS_URL_SUFFIX=XXXXXX-uc.a.run.app npm run test:analysis
+```
+
+
 
 Helper to fetch config into local fallback:
 
@@ -98,12 +124,10 @@ Expected source of truth:
 
 The test suite includes:
 
-1. **Preflight Check Tests**: Validate document classification logic
-2. **Analyze Text Tests**: Verify text analysis and enforcement logic
-3. **Entitlement Tests**: Check plan and limit validation
-4. **Security Rule Tests**: Ensure proper access controls
-5. **Stripe Integration Tests**: Verify Stripe config, product/price setup, checkout session creation, and webhook mock behavior
-6. **MinIO Integration Tests**: Verify storage config and end-to-end S3 operations (head/put/get/delete + presigned URLs)
+1. **Unit Tests** (`functions.test.js`, `analysis.test.js`, `limits.test.js`, `gemini-client.test.js`): Fast, fully mocked — no network, no quota consumed
+2. **Analysis Integration Tests** (`analysis-integration.test.js`): Real deployed functions, real Firebase auth (anon + free tier), quota enforcement
+3. **Stripe Integration Tests** (`stripe.test.js`): Real Stripe test-mode API + deployed webhook
+4. **MinIO Integration Tests** (`minio.test.js`): Real MinIO storage with deployed config
 
 ## Testing Approach
 

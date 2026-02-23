@@ -20,6 +20,23 @@
         "**/.*",
         "**/node_modules/**"
       ],
+      "redirects": [
+        {
+          "source": "/uses-cases",
+          "destination": "/use-cases",
+          "type": 301
+        },
+        {
+          "source": "/uses-cases/",
+          "destination": "/use-cases/",
+          "type": 301
+        },
+        {
+          "source": "/uses-cases/**",
+          "destination": "/use-cases/:splat",
+          "type": 301
+        }
+      ],
       "rewrites": [
         {
           "source": "/api/setDocByPath",
@@ -53,10 +70,6 @@
         },
         {
           "source": "/sign-up{,/**}",
-          "destination": "/app/index.html"
-        },
-        {
-          "source": "/pricing{,/**}",
           "destination": "/app/index.html"
         },
         {

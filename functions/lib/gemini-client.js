@@ -34,15 +34,6 @@ const getFirestore = () => {
     return admin.firestore();
 };
 
-const getRuntimeConfigGeminiKey = () => {
-    try {
-        return asNonEmptyString(functions.config().gemini?.key);
-    } catch (error) {
-        // functions.config() may be unavailable in some local/test runtimes.
-        return '';
-    }
-};
-
 const getGeminiConfigFromFirestore = async () => {
     const db = getFirestore();
     const snap = await db.collection('admin').doc('gemini').get();
@@ -55,8 +46,7 @@ const getGeminiConfigFromFirestore = async () => {
     return {
         key: asNonEmptyString(modeConfig?.key) || asNonEmptyString(doc.key),
         model: normalizeModelName(
-            asNonEmptyString(process.env.GEMINI_MODEL)
-            || asNonEmptyString(modeConfig?.model)
+            asNonEmptyString(modeConfig?.model)
             || asNonEmptyString(doc.model)
             || DEFAULT_MODEL_NAME
         ),
@@ -64,24 +54,6 @@ const getGeminiConfigFromFirestore = async () => {
 };
 
 const resolveGeminiConfig = async () => {
-    const envKey = asNonEmptyString(process.env.GOOGLE_API_KEY);
-    if (envKey) {
-        return {
-            key: envKey,
-            model: normalizeModelName(asNonEmptyString(process.env.GEMINI_MODEL) || DEFAULT_MODEL_NAME),
-            source: 'GOOGLE_API_KEY',
-        };
-    }
-
-    const runtimeKey = getRuntimeConfigGeminiKey();
-    if (runtimeKey) {
-        return {
-            key: runtimeKey,
-            model: normalizeModelName(asNonEmptyString(process.env.GEMINI_MODEL) || DEFAULT_MODEL_NAME),
-            source: 'functions.config().gemini.key',
-        };
-    }
-
     try {
         const firestoreCfg = await getGeminiConfigFromFirestore();
         if (firestoreCfg?.key) {
@@ -97,7 +69,7 @@ const resolveGeminiConfig = async () => {
 
     return {
         key: '',
-        model: normalizeModelName(asNonEmptyString(process.env.GEMINI_MODEL) || DEFAULT_MODEL_NAME),
+        model: DEFAULT_MODEL_NAME,
         source: null,
     };
 };
@@ -117,7 +89,7 @@ async function getGeminiModel() {
 
         if (!apiKey) {
             throw new Error(
-                'Google API Key not configured. Set GOOGLE_API_KEY, functions.config().gemini.key, or Firestore admin/gemini.key (logical path /admin/gemini/key).'
+                'Google API Key not configured. Set Firestore admin/gemini.key (logical path /admin/gemini/key).'
             );
         }
 

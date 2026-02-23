@@ -18,9 +18,9 @@
 │  │  │  │  ├─ Explain Selection ✅ (backend implemented)        │   │    │
 │  │  │  │  ├─ Highlight Risks ✅ (backend implemented)          │   │    │
 │  │  │  │  ├─ Translate to Plain English ✅ (backend impl.)     │   │    │
-│  │  │  │  └─ Summarize/Improvements ❌ (no dedicated logic)    │   │    │
+│  │  │  │  └─ Summarize/Improvements ✅ (reuses analyzeText)    │   │    │
 │  │  │  ├─ AnalysisSidebar.jsx (Results display)                │   │    │
-│  │  │  └─ Risk Badges (Not rendering - needs implementation)  │   │    │
+│  │  │  └─ Risk Badges ✅ (renders via PDF annotations overlay) │   │    │
 │  │  └──────────────────────────────────────────────────────────────┘   │    │
 │  └─────────────────────────────────────────────────────────────────────┘    │
 │                                                                               │
@@ -32,12 +32,12 @@
 │  │  │  │   └─ calls: analyzeTextCall()                        │     │    │
 │  │  │  ├─ handleAnalyzeByType()                               │     │    │
 │  │  │  │   └─ calls: analyzeByTypeCall()                      │     │    │
-│  │  │  ├─ handleExplainSelection() ⚠️                        │     │    │
-│  │  │  │   └─ calls: explainSelection() [contract mismatch]  │     │    │
-│  │  │  ├─ handleHighlightRisks() ⚠️                          │     │    │
-│  │  │  │   └─ calls: highlightRisks() [contract mismatch]    │     │    │
-│  │  │  └─ handleTranslateToPlainEnglish() ⚠️                │     │    │
-│  │  │      └─ calls: translateToPlainEnglish() [mismatch]    │     │    │
+│  │  │  ├─ handleExplainSelection() ✅                         │     │    │
+│  │  │  │   └─ calls: explainSelection()                       │     │    │
+│  │  │  ├─ handleHighlightRisks() ✅                           │     │    │
+│  │  │  │   └─ calls: highlightRisks()                         │     │    │
+│  │  │  └─ handleTranslateToPlainEnglish() ✅                  │     │    │
+│  │  │      └─ calls: translateToPlainEnglish()                │     │    │
 │  │  └────────────────────────────────────────────────────────────┘     │    │
 │  └─────────────────────────────────────────────────────────────────────┘    │
 │                                                                               │
@@ -137,7 +137,7 @@
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                           GOOGLE GEMINI API                                 │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│  ├─ Model: gemini-2.0-flash (fast) or gemini-2.0-pro (accurate)           │
+│  ├─ Model: gemini-2.5-flash (current default; overridable via admin/gemini.model) │
 │  ├─ Input: Prompts + document text                                         │
 │  ├─ Output: JSON structured analysis                                       │
 │  └─ Status: ✅ INTEGRATED (further tuning and tests in progress)         │
@@ -186,7 +186,7 @@ User Action: Click "Analyze Document"
     │    ├─ ✅ CURRENT: Calls Gemini API
     │    ├─ 🟡 NEXT: finalize contract mapping and output consistency
     │    │   ├─ Build analysis prompt
-    │    │   ├─ Call gemini-2.0-flash model
+    │    │   ├─ Call gemini-2.5-flash model
     │    │   ├─ Parse JSON response
     │    │   └─ Extract:
     │    │      ├─ Plain explanation

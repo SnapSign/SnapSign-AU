@@ -4,7 +4,7 @@
 - This repository is the **Firebase deployment/hosting umbrella** for the `snapsign-au` Firebase project (hosting + functions + rules).
 - `Decodocs/` is a **nested, independent git repository** (it contains its own `.git/`).
 - DecoDocs must remain physically nested under this repo so Firebase Hosting can deploy static outputs from `Decodocs/web/decodocs.com/` and `Decodocs/admin/dist/`.
-- Note: `firebase.json` currently uses lowercase `decodocs/...` paths; the actual folder in this repo is `Decodocs/` (capital D).
+- Note: keep `firebase.json` paths consistent with the on-disk `Decodocs/` casing (capital D).
 
 **Rule:** Do not vendor/copy DecoDocs into SnapSign-AU history. Keep it as its own repo.
 
@@ -60,3 +60,8 @@ If a deployment ever requests Blaze/Cloud Build/Artifact Registry for basic stat
 ## Documentation & project context
 - Both code changes and copywriting (docs, UI text, marketing copy) require project-level understanding. Before making non-trivial technical or content changes, consult `DOCS_INDEX.md` for the curated entry points, architecture overviews, runbooks, and owner contacts.
 - Use the index to find the canonical doc for the area you are changing and to identify the right owner(s) to review copy or implementation updates.
+
+## Task tracking ownership
+- This umbrella repo tracks platform/integration work in `TASKS.md`.
+- Do not log DecoDocs product work in this repo's task file; use `Decodocs/TODO.md` instead.
+- Admin-portal-only work should be tracked in `Decodocs/admin/TODO.md`.

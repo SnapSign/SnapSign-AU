@@ -1,0 +1,101 @@
+---
+const {
+  donateUrl = "https://u24.gov.ua",
+  npmUrl = "https://www.npmjs.com/package/react-support-ukraine-banner",
+  text = "Donate to support freedom.",
+} = Astro.props;
+---
+
+<div class="support-ukraine-banner">
+  <a
+    class="support-ukraine-banner__donate"
+    href={donateUrl}
+    target="_blank"
+    rel="noopener noreferrer"
+    title={text}
+  >
+    <div role="img" aria-label="Flag of Ukraine" class="support-ukraine-banner__flag">
+      <div class="support-ukraine-banner__flag-blue"></div>
+      <div class="support-ukraine-banner__flag-yellow"></div>
+    </div>
+    <div class="support-ukraine-banner__text">{text}</div>
+  </a>
+
+  <a
+    class="support-ukraine-banner__get-same"
+    href={npmUrl}
+    target="_blank"
+    rel="noopener noreferrer"
+    aria-label="Get the same banner on npm"
+    title="Get the same: react-support-ukraine-banner"
+  >
+    Get the same
+  </a>
+</div>
+
+<style>
+  .support-ukraine-banner {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    background: #000;
+    display: flex;
+    justify-content: center;
+    padding: 5px;
+    z-index: 10000;
+    font-family: arial;
+  }
+
+  .support-ukraine-banner__donate {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+  }
+
+  .support-ukraine-banner__flag {
+    height: 25px;
+    margin-right: 10px;
+  }
+
+  .support-ukraine-banner__flag-blue,
+  .support-ukraine-banner__flag-yellow {
+    width: 40px;
+    height: 12.5px;
+  }
+
+  .support-ukraine-banner__flag-blue {
+    background: #005bbb;
+  }
+
+  .support-ukraine-banner__flag-yellow {
+    background: #ffd500;
+  }
+
+  .support-ukraine-banner__text {
+    color: white;
+    font-size: 12px;
+    line-height: 25px;
+  }
+
+  .support-ukraine-banner__get-same {
+    position: absolute;
+    right: 10px;
+    top: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+    line-height: 25px;
+    color: #000; /* black-on-black until banner hover/focus */
+    transition: color 150ms ease;
+    cursor: pointer;
+    text-decoration: none;
+  }
+
+  .support-ukraine-banner:hover .support-ukraine-banner__get-same,
+  .support-ukraine-banner:focus-within .support-ukraine-banner__get-same {
+    color: #fff;
+  }
+</style>
+

@@ -12,6 +12,7 @@ const {
   ogSiteName,
 } = Astro.props;
 import SiteFooter from "../components/SiteFooter.astro";
+import SupportUkraineBanner from "../components/SupportUkraineBanner.astro";
 ---
 <!DOCTYPE html>
 <html lang="en">
@@ -66,6 +67,9 @@ import SiteFooter from "../components/SiteFooter.astro";
     <slot name="head" />
   </head>
   <body>
+    <div style="position: relative; height: 35px;">
+      <SupportUkraineBanner />
+    </div>
     <main>
       <slot />
     </main>

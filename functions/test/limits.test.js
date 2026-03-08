@@ -145,10 +145,12 @@ describe('Entitlement & Limits', () => {
             const result = await wrapped(req);
 
             expect(result.ok).to.be.true;
-            // Verify usage incremented
-            expect(userDocStub.set.calledOnce).to.be.true;
-            const args = userDocStub.set.firstCall.args[0];
-            expect(args.usage.anonTokensUsed).to.equal('INCREMENT_25'); // 100 chars / 4 = 25 tokens
+            // Verify usage incremented (note: getUserEntitlement also updates lastSeenAt via userRef.set)
+            const usageCall = userDocStub.set
+                .getCalls()
+                .find((c) => c.args?.[0]?.usage?.anonTokensUsed);
+            expect(usageCall, 'expected anonTokensUsed increment write').to.exist;
+            expect(usageCall.args[0].usage.anonTokensUsed).to.equal('INCREMENT_25'); // 100 chars / 4 = 25 tokens
         });
 
         it('should block request if usage exceeds limits', async () => {
@@ -178,7 +180,11 @@ describe('Entitlement & Limits', () => {
             */
             expect(result.ok).to.be.false;
             expect(result.code).to.equal('ANON_TOKEN_LIMIT');
-            expect(userDocStub.set.called).to.be.false; // No increment
+            // getUserEntitlement may still write lastSeenAt; ensure no usage increment write occurred.
+            const usageCall = userDocStub.set
+                .getCalls()
+                .find((c) => c.args?.[0]?.usage?.anonTokensUsed);
+            expect(usageCall, 'did not expect anonTokensUsed increment write').to.not.exist;
         });
     });
 

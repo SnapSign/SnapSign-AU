@@ -553,8 +553,78 @@ exports.analyzeText = functions.https.onCall(async ({ data, ...context }) => {
   try {
     const entitlement = await getUserEntitlement(context);
 
+    const {
+      docHash,
+      stats = {},
+      text = {},
+      options = {}
+    } = data || {};
+
+    // Validate inputs
+    validateDocHash(docHash);
+
+    if (!text || !text.value) {
+      throw new functions.https.HttpsError('invalid-argument', 'Text object with value is required.');
+    }
+
+    // If we already have an analysis saved for this hash, serve it immediately.
+    // This avoids re-charging tokens and makes "open document → see summary" instant for returning documents.
+    const ANALYSIS_CACHE_SCHEMA_VERSION = 1;
+    const cacheRef = db.collection('doc_analyses').doc(docHash);
+    const cacheSnap = await cacheRef.get();
+    if (cacheSnap.exists) {
+      const cached = cacheSnap.data() || {};
+      if (cached.analysisSchemaVersion === ANALYSIS_CACHE_SCHEMA_VERSION && cached.result) {
+        const cachedResult = validateOutputSchema(cached.result);
+
+        await cacheRef.set(
+          {
+            lastServedAt: admin.firestore.FieldValue.serverTimestamp(),
+            lastServedByPuid: entitlement.puid,
+          },
+          { merge: true }
+        );
+
+        // Record docHash ledger (even when serving cache)
+        await db.collection('docshashes').doc(docHash).set(
+          {
+            docHash,
+            lastSeenAt: admin.firestore.FieldValue.serverTimestamp(),
+            lastSeenByPuid: entitlement.puid,
+          },
+          { merge: true }
+        );
+
+        // Log usage event (no token spend; cached result)
+        await db.collection('usage_events').add({
+          puid: entitlement.puid,
+          uid: entitlement.uid,
+          tier: entitlement.tier,
+          docHash,
+          event: 'analyze_cached',
+          at: admin.firestore.FieldValue.serverTimestamp(),
+          meta: { provider: 'firestore_cache' },
+        });
+
+        return {
+          ok: true,
+          cached: true,
+          docHash,
+          result: cachedResult,
+          usage: {
+            estimatedTokens: 0,
+            remainingTokens: null,
+          },
+          entitlement: {
+            tier: entitlement.tier,
+            isPro: entitlement.isPro,
+          },
+        };
+      }
+    }
+
     // Enforce rate limit/quota before we do anything expensive
-    const estimatedTokens = estimateTokensFromChars(data?.stats?.totalChars || 0);
+    const estimatedTokens = estimateTokensFromChars(stats?.totalChars || text.value.length || 0);
     const budget = await enforceAndRecordTokenUsage({
       puid: entitlement.puid,
       tier: entitlement.tier,
@@ -573,20 +643,6 @@ exports.analyzeText = functions.https.onCall(async ({ data, ...context }) => {
       };
     }
 
-    const {
-      docHash,
-      stats,
-      text,
-      options = {}
-    } = data;
-
-    // Validate inputs
-    validateDocHash(docHash);
-
-    if (!text || !text.value) {
-      throw new functions.https.HttpsError('invalid-argument', 'Text object with value is required.');
-    }
-
     // Use the stripped text for analysis
     const strippedText = text.value;
     const model = await getGeminiModel();
@@ -599,6 +655,33 @@ exports.analyzeText = functions.https.onCall(async ({ data, ...context }) => {
       temperature: 0.2,
     });
     const validatedAnalysis = validateOutputSchema(analysisData);
+
+    // Cache analysis by docHash so returning users instantly see the previously generated summary.
+    await cacheRef.set(
+      {
+        docHash,
+        analysisSchemaVersion: ANALYSIS_CACHE_SCHEMA_VERSION,
+        result: validatedAnalysis,
+        provider: 'gemini',
+        model: getActiveGeminiModelName(),
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdByPuid: entitlement.puid,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastServedAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastServedByPuid: entitlement.puid,
+        stats: {
+          pageCount: stats?.pageCount || null,
+          totalChars: stats?.totalChars || null,
+          languageHint: stats?.languageHint || null,
+        },
+        options: {
+          documentType: options?.documentType || null,
+          tasks: Array.isArray(options?.tasks) ? options.tasks : null,
+          targetLanguage: options?.targetLanguage || null,
+        },
+      },
+      { merge: true }
+    );
 
     // Record docHash ledger
     await db.collection('docshashes').doc(docHash).set(

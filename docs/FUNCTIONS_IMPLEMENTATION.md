@@ -8,13 +8,13 @@ It reflects the live model in `functions/index.js`:
 - Firebase Auth (anonymous + linked providers)
 - token-budget enforcement by tier
 - docHash ledger + usage events
-- no document content persistence in Firestore
+- analysis cache in Firestore by `docHash` (no raw full document text persisted)
 
 ## Architecture
 
 ### Components
 - Firebase Cloud Functions
-- Firestore (`users`, `usage_daily`, `usage_events`, `docshashes`)
+- Firestore (`users`, `usage_daily`, `usage_events`, `docshashes`, `doc_analyses`)
 - Firebase Auth
 - Client-side PDF.js for extraction + SHA-256 docHash
 
@@ -53,14 +53,17 @@ Input:
 
 Behavior:
 - validates docHash/text
+- checks `doc_analyses/{docHash}` first; returns cached analysis when available
 - recomputes scan ratio and blocks OCR-required docs for non-Pro
 - computes `estimatedTokens = floor(totalChars / 4)`
 - enforces per-tier token budgets
+- writes/updates `doc_analyses/{docHash}` with normalized result on fresh analysis
 - writes `docshashes/{docHash}` ledger metadata
-- writes `usage_events` entry
+- writes `usage_events` entry (`analyze` or `analyze_cached`)
 
 Output (success):
 - `ok: true`
+- `cached` (`true` when served from Firestore cache)
 - `docHash`
 - `result` (normalized analysis schema)
 - `usage` (`estimatedTokens`, `remainingTokens`)
@@ -114,6 +117,9 @@ Current response:
   - analysis event log
 - `docshashes/{docHash}`
   - doc hash ledger metadata
+- `doc_analyses/{docHash}`
+  - cached normalized analysis result keyed by hash
+  - includes cache/version metadata (`analysisSchemaVersion`, provider/model, timestamps, last served info)
 
 ## Config Constants (Current)
 - `MIN_CHARS_PER_PAGE = 30`

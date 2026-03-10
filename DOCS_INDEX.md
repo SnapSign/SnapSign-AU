@@ -33,6 +33,7 @@ It includes only Markdown documentation and groups docs by ownership/purpose.
 - [`Decodocs/TODO.md`](Decodocs/TODO.md) - engineering TODO tracker
 - [`Decodocs/docs/README.md`](Decodocs/docs/README.md) - full product/architecture/api/deploy map
 - [`Decodocs/docs/validation/README.md`](Decodocs/docs/validation/README.md) - validation doc-type specs
+- [`Decodocs/docs/PAGE_MANAGEMENT.md`](Decodocs/docs/PAGE_MANAGEMENT.md) - page management feature documentation
 - [`Decodocs/web/README.md`](Decodocs/web/README.md) - web app setup and runbook
 - [`Decodocs/web/TEST_PLAN.md`](Decodocs/web/TEST_PLAN.md) - web test plan
 - [`Decodocs/admin/README.md`](Decodocs/admin/README.md) - admin app usage

@@ -67,7 +67,14 @@ run_npm_install() {
 run_npm_build() {
   local dir="$1"
   log "Building $dir"
-  (cd "$dir" && npm run build --if-present)
+  # attempt normal build; on failure try clean install then rebuild
+  if ! (cd "$dir" && npm run build --if-present); then
+    log "Build failed in $dir. Removing node_modules and retrying install + build."
+    (cd "$dir" && rm -rf node_modules package-lock.json && npm i && npm run build --if-present) || {
+      echo "Error: build still failing in $dir after retry" >&2
+      return 1
+    }
+  fi
 }
 
 while [[ $# -gt 0 ]]; do
